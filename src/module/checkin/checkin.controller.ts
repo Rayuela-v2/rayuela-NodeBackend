@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   Res,
   UploadedFiles,
@@ -18,7 +19,11 @@ import { MulterError } from 'multer';
 import { CheckinService } from './checkin.service';
 import { CreateCheckinDto } from './dto/create-checkin.dto';
 import { UpdateCheckinDto } from './dto/update-checkin.dto';
+import { AdminCheckinQueryDto } from './dto/admin-checkin-query.dto';
 import { JwtAuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/role.decorator';
+import { UserRole } from '../auth/users/user.schema';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ALLOWED_IMAGE_MIMES,
@@ -67,7 +72,12 @@ export class CheckinController {
     // When the service replays a previously-stored idempotency key we
     // surface it via a header so the mobile drainer (and any other
     // automated client) can tell apart a fresh insert from a replay.
-    if (result && 'replayed' in result && result.replayed && typeof result.id === 'string') {
+    if (
+      result &&
+      'replayed' in result &&
+      result.replayed &&
+      typeof result.id === 'string'
+    ) {
       res.setHeader('X-Original-Resource', result.id);
     }
     return result;
@@ -88,6 +98,24 @@ export class CheckinController {
   async findUserCheckins(@Req() req, @Param('projectId') projectId: string) {
     const userId = req.user.userId;
     return this.checkinService.findByProjectId(userId, projectId);
+  }
+
+  /**
+   * Admin-only listing of every checkin for `projectId`. Supports filters
+   * (taskName, taskType, hasPhotos, location radius, userId, dateRange,
+   * contributed) plus pagination via `page` and `limit`.
+   *
+   * Mounted under the more specific `admin/...` path so it doesn't collide
+   * with `GET /checkin/:id`.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  @Get('admin/project/:projectId')
+  async findForAdmin(
+    @Param('projectId') projectId: string,
+    @Query() query: AdminCheckinQueryDto,
+  ) {
+    return this.checkinService.findForAdmin(projectId, query);
   }
 
   @UseGuards(JwtAuthGuard)

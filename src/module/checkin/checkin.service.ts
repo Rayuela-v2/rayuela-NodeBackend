@@ -1,7 +1,8 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { CreateCheckinDto } from './dto/create-checkin.dto';
 import { UpdateCheckinDto } from './dto/update-checkin.dto';
-import { CheckInDao } from './persistence/checkin.dao';
+import { AdminCheckinQueryDto } from './dto/admin-checkin-query.dto';
+import { AdminCheckinFilter, CheckInDao } from './persistence/checkin.dao';
 import { TaskService } from '../task/task.service';
 import { Task } from '../task/entities/task.entity';
 import { Checkin } from './entities/checkin.entity';
@@ -217,6 +218,90 @@ export class CheckinService {
     return this.checkInDao.findByProjectId(userId, projectId);
   }
 
+  /**
+   * Admin endpoint: list every checkin for the project with optional filters
+   * and pagination. The "task name" filter is resolved here because tasks
+   * live in their own collection — we look them up first and pass the
+   * matching ids down to the DAO. Each checkin in the response is enriched
+   * with `taskName` so the admin doesn't have to cross-reference manually.
+   */
+  async findForAdmin(projectId: string, query: AdminCheckinQueryDto) {
+    const limit = clamp(
+      parseIntSafe(query.limit, ADMIN_DEFAULT_LIMIT),
+      1,
+      ADMIN_MAX_LIMIT,
+    );
+    const page = Math.max(1, parseIntSafe(query.page, 1));
+
+    let taskIdIn: string[] | undefined;
+    let projectTasks: Task[] | null = null;
+    if (query.taskName && query.taskName.trim().length > 0) {
+      projectTasks = await this.taskService.findByProjectId(projectId);
+      const needle = query.taskName.trim().toLowerCase();
+      taskIdIn = projectTasks
+        .filter(
+          (t) =>
+            (t.name && t.name.toLowerCase().includes(needle)) ||
+            (t.description && t.description.toLowerCase().includes(needle)),
+        )
+        .map((t) => t.getId().toString());
+      // No tasks match → return an empty page early to spare a Mongo round-trip.
+      if (taskIdIn.length === 0) {
+        return { items: [], total: 0, page, limit };
+      }
+    }
+
+    const filter: AdminCheckinFilter = {
+      projectId,
+      taskType: query.taskType?.trim() || undefined,
+      userId: query.userId?.trim() || undefined,
+      taskIdIn,
+      hasPhotos: parseBool(query.hasPhotos),
+      contributed: parseBool(query.contributed),
+      dateFrom: parseDate(query.dateFrom),
+      dateTo: parseDate(query.dateTo),
+      centerLat: parseFloatSafe(query.latitude),
+      centerLng: parseFloatSafe(query.longitude),
+      radiusKm: parseFloatSafe(query.radiusKm),
+      page,
+      limit,
+      sortOrder: query.sortOrder === 'asc' ? 1 : -1,
+    };
+
+    const result = await this.checkInDao.findForAdmin(filter);
+
+    // Skip the task-enrichment DB call when there is nothing to enrich.
+    if (result.items.length === 0) {
+      return { items: [], total: result.total, page: result.page, limit: result.limit };
+    }
+
+    // Build an id→task map once so the response can include task name + type.
+    if (!projectTasks) {
+      projectTasks = await this.taskService.findByProjectId(projectId);
+    }
+    const taskById = new Map<string, Task>(
+      projectTasks.map((t) => [t.getId().toString(), t]),
+    );
+    const items = result.items.map((c: any) => {
+      const plain = typeof c.toObject === 'function' ? c.toObject() : c;
+      const task = plain.contributesTo
+        ? taskById.get(plain.contributesTo.toString())
+        : undefined;
+      return {
+        ...plain,
+        taskName: task?.name || null,
+        taskDescription: task?.description || null,
+      };
+    });
+
+    return {
+      items,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    };
+  }
+
   private async getDataFromDB(createCheckinDto: CreateCheckinDto) {
     const tasks: Task[] = await this.taskService.findByProjectId(
       createCheckinDto.projectId,
@@ -236,4 +321,36 @@ export class CheckinService {
     const ch = await this.findOne(params.checkinId);
     return this.userService.rate(params.userId, ch, params.rate);
   }
+}
+
+const ADMIN_DEFAULT_LIMIT = 20;
+const ADMIN_MAX_LIMIT = 100;
+
+function parseIntSafe(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function parseFloatSafe(value: string | undefined): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function parseBool(value: string | undefined): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+}
+
+function parseDate(value: string | undefined): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

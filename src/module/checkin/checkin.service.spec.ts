@@ -24,6 +24,7 @@ const mockCheckInDao = {
   update: jest.fn(),
   remove: jest.fn(),
   findByProjectId: jest.fn(),
+  findForAdmin: jest.fn(),
 };
 
 const mockIdempotencyDao = {
@@ -394,12 +395,12 @@ describe('CheckinService', () => {
         userId: 'user1',
         checkinId: 'old-checkin',
       });
-      
+
       const relatedTask = TaskBuilder.withId('task-1')
         .withName('A task')
         .build();
       TaskBuilder.withId('default-task-id').withName('Default Task');
-      
+
       mockCheckInDao.findOne.mockResolvedValue({
         id: 'old-checkin',
         latitude: '0',
@@ -450,6 +451,107 @@ describe('CheckinService', () => {
 
       expect(mockCheckInDao.create).not.toHaveBeenCalled();
     });
+  });
+
+  describe('findForAdmin', () => {
+    it('forwards a parsed filter and clamps the page size', async () => {
+      mockCheckInDao.findForAdmin.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 100,
+      });
+      mockTaskService.findByProjectId.mockResolvedValue([]);
+
+      await service.findForAdmin('project1', {
+        hasPhotos: 'true',
+        contributed: 'false',
+        page: '0',
+        // limit above the cap should clamp to 100.
+        limit: '5000',
+        sortOrder: 'asc',
+        latitude: '10',
+        longitude: '20',
+        radiusKm: '5',
+        dateFrom: '2026-01-01T00:00:00Z',
+        dateTo: 'not-a-date',
+      });
+
+      const filterArg = mockCheckInDao.findForAdmin.mock.calls[0][0];
+      expect(filterArg.projectId).toBe('project1');
+      expect(filterArg.hasPhotos).toBe(true);
+      // taskIdIn should win over `contributed` when set; here neither is taskName,
+      // so contributed flows through as false.
+      expect(filterArg.contributed).toBe(false);
+      expect(filterArg.page).toBe(1); // clamped up
+      expect(filterArg.limit).toBe(100); // clamped down
+      expect(filterArg.sortOrder).toBe(1);
+      expect(filterArg.centerLat).toBe(10);
+      expect(filterArg.centerLng).toBe(20);
+      expect(filterArg.radiusKm).toBe(5);
+      expect(filterArg.dateFrom).toBeInstanceOf(Date);
+      expect(filterArg.dateTo).toBeUndefined();
+    });
+
+    it('resolves taskName to matching task ids', async () => {
+      const taskA = TaskBuilder.withId('a')
+        .withName('Limpieza de plaza')
+        .build();
+      const taskB = TaskBuilder.withId('b').withName('Reciclaje').build();
+      mockTaskService.findByProjectId.mockResolvedValue([taskA, taskB]);
+      mockCheckInDao.findForAdmin.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+      });
+
+      await service.findForAdmin('p1', { taskName: 'limpieza' });
+
+      const filterArg = mockCheckInDao.findForAdmin.mock.calls[0][0];
+      expect(filterArg.taskIdIn).toEqual(['a']);
+    });
+
+    it('short-circuits when taskName matches zero tasks', async () => {
+      mockTaskService.findByProjectId.mockResolvedValue([
+        TaskBuilder.withName('Other').build(),
+      ]);
+
+      const result = await service.findForAdmin('p1', { taskName: 'nope-xyz' });
+
+      expect(mockCheckInDao.findForAdmin).not.toHaveBeenCalled();
+      expect(result).toEqual({ items: [], total: 0, page: 1, limit: 20 });
+    });
+
+    it('enriches each item with the matching taskName', async () => {
+      const taskA = TaskBuilder.withId('a').withName('Limpieza').build();
+      mockTaskService.findByProjectId.mockResolvedValue([taskA]);
+      mockCheckInDao.findForAdmin.mockResolvedValue({
+        items: [
+          { _id: 'c1', contributesTo: 'a' },
+          { _id: 'c2', contributesTo: '' },
+        ],
+        total: 2,
+        page: 1,
+        limit: 20,
+      });
+
+      const result = await service.findForAdmin('p1', {});
+
+      expect(result.items[0].taskName).toBe('Limpieza');
+      expect(result.items[1].taskName).toBeNull();
+    });
+  });
+
+  describe('idempotency-records', () => {
+    const dto: CreateCheckinDto = {
+      datetime: new Date(),
+      taskType: '',
+      userId: 'user1',
+      projectId: 'project1',
+      latitude: '0',
+      longitude: '0',
+    };
 
     it('records the key after a successful first-time create', async () => {
       mockIdempotencyDao.findByKey.mockResolvedValue(null);

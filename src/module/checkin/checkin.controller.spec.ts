@@ -15,6 +15,7 @@ describe('CheckinController', () => {
     update: jest.fn(),
     remove: jest.fn(),
     findByProjectId: jest.fn(),
+    findForAdmin: jest.fn(),
     rate: jest.fn(),
   };
 
@@ -116,6 +117,28 @@ describe('CheckinController', () => {
       const body = { checkinId: 'c1', rate: 5 };
       await controller.rate(body, req);
       expect(service.rate).toHaveBeenCalledWith({ ...body, userId: '1' });
+    });
+  });
+
+  describe('findForAdmin', () => {
+    it('forwards the project id and query to the service', async () => {
+      const query = {
+        taskName: 'limpieza',
+        hasPhotos: 'true',
+        page: '2',
+        limit: '10',
+      } as any;
+      mockCheckinService.findForAdmin.mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        page: 2,
+        limit: 10,
+      });
+
+      const result = await controller.findForAdmin('proj1', query);
+
+      expect(service.findForAdmin).toHaveBeenCalledWith('proj1', query);
+      expect(result).toEqual({ items: [], total: 0, page: 2, limit: 10 });
     });
   });
 });

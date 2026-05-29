@@ -128,4 +128,140 @@ describe('CheckInDao', () => {
     await dao.findByProjectId('u1', 'p1');
     expect(model.find).toHaveBeenCalledWith({ projectId: 'p1', userId: 'u1' });
   });
+
+  describe('findForAdmin', () => {
+    /**
+     * Wires the next call to `find()` and to `countDocuments()` so the
+     * full chain `.sort().skip().limit().exec()` resolves to `items` and
+     * `countDocuments().exec()` to `count`.
+     */
+    const wireFindAndCount = (items: any[], count: number) => {
+      const findChain = {
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(items),
+      };
+      const countChain = {
+        exec: jest.fn().mockResolvedValue(count),
+      };
+      mockModel.find.mockReturnValueOnce(findChain);
+      (MockModel as any).countDocuments = jest.fn().mockReturnValue(countChain);
+      return { findChain, countChain };
+    };
+
+    it('paginates with default sort=desc on datetime', async () => {
+      const { findChain } = wireFindAndCount([{ _id: 'a' }], 1);
+
+      const res = await dao.findForAdmin({
+        projectId: 'p1',
+        page: 1,
+        limit: 20,
+        sortOrder: -1,
+      });
+
+      expect(model.find).toHaveBeenLastCalledWith({ projectId: 'p1' });
+      expect(findChain.sort).toHaveBeenCalledWith({ datetime: -1 });
+      expect(findChain.skip).toHaveBeenCalledWith(0);
+      expect(findChain.limit).toHaveBeenCalledWith(20);
+      expect(res).toEqual({
+        items: [{ _id: 'a' }],
+        total: 1,
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    it('applies hasPhotos=true filter', async () => {
+      wireFindAndCount([], 0);
+
+      await dao.findForAdmin({
+        projectId: 'p1',
+        hasPhotos: true,
+        page: 1,
+        limit: 20,
+        sortOrder: -1,
+      });
+
+      expect(model.find).toHaveBeenLastCalledWith({
+        projectId: 'p1',
+        'imageRefs.0': { $exists: true },
+      });
+    });
+
+    it('applies hasPhotos=false filter via $and', async () => {
+      wireFindAndCount([], 0);
+
+      await dao.findForAdmin({
+        projectId: 'p1',
+        hasPhotos: false,
+        page: 1,
+        limit: 20,
+        sortOrder: -1,
+      });
+
+      const arg = model.find.mock.calls[model.find.mock.calls.length - 1][0];
+      expect(arg.projectId).toBe('p1');
+      expect(arg.$and).toEqual([
+        {
+          $or: [{ imageRefs: { $exists: false } }, { imageRefs: { $size: 0 } }],
+        },
+      ]);
+    });
+
+    it('passes taskIdIn through as $in on contributesTo', async () => {
+      wireFindAndCount([], 0);
+
+      await dao.findForAdmin({
+        projectId: 'p1',
+        taskIdIn: ['t1', 't2'],
+        page: 1,
+        limit: 20,
+        sortOrder: -1,
+      });
+
+      expect(model.find).toHaveBeenLastCalledWith({
+        projectId: 'p1',
+        contributesTo: { $in: ['t1', 't2'] },
+      });
+    });
+
+    it('respects asc sort order', async () => {
+      const { findChain } = wireFindAndCount([], 0);
+
+      await dao.findForAdmin({
+        projectId: 'p1',
+        page: 1,
+        limit: 20,
+        sortOrder: 1,
+      });
+
+      expect(findChain.sort).toHaveBeenCalledWith({ datetime: 1 });
+    });
+
+    it('applies geo radius filter in-memory', async () => {
+      // Inside ≈ at the center of (0,0); outside ≈ ~111km away on the equator.
+      const inside = { latitude: '0', longitude: '0', _id: 'a' };
+      const outside = { latitude: '1', longitude: '0', _id: 'b' };
+      const findChain = {
+        sort: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([inside, outside]),
+      };
+      mockModel.find.mockReturnValueOnce(findChain);
+
+      const res = await dao.findForAdmin({
+        projectId: 'p1',
+        centerLat: 0,
+        centerLng: 0,
+        radiusKm: 1,
+        page: 1,
+        limit: 20,
+        sortOrder: -1,
+      });
+
+      expect(res.total).toBe(1);
+      expect(res.items).toEqual([inside]);
+    });
+  });
 });
