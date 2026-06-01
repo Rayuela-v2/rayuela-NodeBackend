@@ -12,6 +12,9 @@ export class AdminCheckinQueryDto {
   /** Filter by task type as stored on the checkin (exact match). */
   taskType?: string;
 
+  /** Filter by badge name unlocked during checkin (exact match). */
+  badgeName?: string;
+
   /** Restrict to checkins authored by a specific user. */
   userId?: string;
 

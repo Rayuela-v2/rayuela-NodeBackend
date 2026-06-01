@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Document, PipelineStage } from 'mongoose';
+import { GeoUtils } from '../task/utils/geoUtils';
+import { TimeInterval } from '../task/entities/time-restriction.entity';
 import {
   CheckInDocument,
   CheckInTemplate,
@@ -356,5 +358,84 @@ export class AnalyticsDao {
       totalBadgesEarned: badgesResult[0]?.total ?? 0,
       totalPointsAwarded: pointsResult[0]?.total ?? 0,
     };
+  }
+
+  async communityStats(projectId: string): Promise<any> {
+    const project = await this.projectModel.findById(projectId).exec();
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const checkins = await this.checkinModel.find({ projectId }).exec();
+    const checkinIds = checkins.map((c) => c._id.toString());
+    const moves = await this.moveModel.find({ checkinId: { $in: checkinIds } }).exec();
+    const moveByCheckinId = new Map<string, any>(
+      moves.map((m) => [m.checkinId, m]),
+    );
+
+    const areas = project.areas?.features || [];
+    const intervals = (project.timeIntervals || []).map(
+      (ti) => new TimeInterval(ti.name, ti.days, ti.time, new Date(ti.startDate), new Date(ti.endDate)),
+    );
+
+    const areaStatsMap = new Map<string, { areaName: string; checkinsCount: number; totalPoints: number; totalBadges: number }>();
+    for (const area of areas) {
+      const areaId = area.properties.id || area.properties.name || 'Unknown';
+      const areaName = area.properties.name || areaId;
+      areaStatsMap.set(areaId.toString(), { areaName, checkinsCount: 0, totalPoints: 0, totalBadges: 0 });
+    }
+    areaStatsMap.set('Outside Area', { areaName: 'Fuera de Área', checkinsCount: 0, totalPoints: 0, totalBadges: 0 });
+
+    const taskTypeStatsMap = new Map<string, number>();
+    const intervalStatsMap = new Map<string, number>();
+
+    for (const ch of checkins) {
+      const move = moveByCheckinId.get(ch._id.toString());
+      const points = move?.newPoints || 0;
+      const badgesCount = move?.newBadges?.length || 0;
+
+      let matchedAreaId = 'Outside Area';
+      for (const area of areas) {
+        const areaId = area.properties.id || area.properties.name || 'Unknown';
+        if (GeoUtils.isPointInPolygon(parseFloat(ch.longitude), parseFloat(ch.latitude), area.geometry)) {
+          matchedAreaId = areaId.toString();
+          break;
+        }
+      }
+
+      const areaStat = areaStatsMap.get(matchedAreaId);
+      if (areaStat) {
+        areaStat.checkinsCount++;
+        areaStat.totalPoints += points;
+        areaStat.totalBadges += badgesCount;
+      }
+
+      const tType = ch.taskType || 'Unknown';
+      taskTypeStatsMap.set(tType, (taskTypeStatsMap.get(tType) || 0) + 1);
+
+      let matchedInterval = 'Cualquiera';
+      for (const ti of intervals) {
+        if (ti.satisfy(ch.datetime)) {
+          matchedInterval = ti.name;
+          break;
+        }
+      }
+      intervalStatsMap.set(matchedInterval, (intervalStatsMap.get(matchedInterval) || 0) + 1);
+    }
+
+    const byArea = Array.from(areaStatsMap.entries()).map(([areaId, val]) => ({
+      areaId,
+      ...val,
+    }));
+    const byTaskType = Array.from(taskTypeStatsMap.entries()).map(([taskType, checkinsCount]) => ({
+      taskType,
+      checkinsCount,
+    }));
+    const byInterval = Array.from(intervalStatsMap.entries()).map(([timeIntervalId, checkinsCount]) => ({
+      timeIntervalId,
+      checkinsCount,
+    }));
+
+    return { byArea, byTaskType, byInterval };
   }
 }

@@ -233,6 +233,15 @@ export class CheckinService {
     );
     const page = Math.max(1, parseIntSafe(query.page, 1));
 
+    let checkinIdIn: string[] | undefined;
+    if (query.badgeName && query.badgeName.trim().length > 0) {
+      const moves = await this.moveDao.findMovesByBadge(query.badgeName.trim());
+      checkinIdIn = moves.map((m) => m.checkinId);
+      if (checkinIdIn.length === 0) {
+        return { items: [], total: 0, page, limit };
+      }
+    }
+
     let taskIdIn: string[] | undefined;
     let projectTasks: Task[] | null = null;
     if (query.taskName && query.taskName.trim().length > 0) {
@@ -256,6 +265,7 @@ export class CheckinService {
       taskType: query.taskType?.trim() || undefined,
       userId: query.userId?.trim() || undefined,
       taskIdIn,
+      checkinIdIn,
       hasPhotos: parseBool(query.hasPhotos),
       contributed: parseBool(query.contributed),
       dateFrom: parseDate(query.dateFrom),
@@ -282,15 +292,25 @@ export class CheckinService {
     const taskById = new Map<string, Task>(
       projectTasks.map((t) => [t.getId().toString(), t]),
     );
+
+    const checkinIds = result.items.map((c: any) => c._id.toString());
+    const moves = await this.moveDao.findMovesByCheckinIds(checkinIds);
+    const moveByCheckinId = new Map<string, any>(
+      moves.map((m) => [m.checkinId, m]),
+    );
+
     const items = result.items.map((c: any) => {
       const plain = typeof c.toObject === 'function' ? c.toObject() : c;
       const task = plain.contributesTo
         ? taskById.get(plain.contributesTo.toString())
         : undefined;
+      const move = moveByCheckinId.get(plain._id.toString());
       return {
         ...plain,
         taskName: task?.name || null,
         taskDescription: task?.description || null,
+        newPoints: move?.newPoints || 0,
+        newBadges: move?.newBadges || [],
       };
     });
 

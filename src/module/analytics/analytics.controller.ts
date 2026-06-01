@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import {
   ActiveUsersSeries,
@@ -90,6 +90,13 @@ export class AnalyticsController {
       startDate,
       endDate,
     );
+  }
+
+  @Get('project/:projectId/community-stats')
+  getCommunityStats(
+    @Param('projectId') projectId: string,
+  ): Promise<any> {
+    return this.analyticsService.getCommunityStats(projectId);
   }
 
   @Get('summary')

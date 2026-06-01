@@ -70,6 +70,10 @@ export class AnalyticsService {
     );
   }
 
+  getCommunityStats(projectId: string) {
+    return this.analyticsDao.communityStats(projectId);
+  }
+
   getSummary(projectId?: string, startDate?: string, endDate?: string) {
     return this.analyticsDao.summary(projectId, startDate, endDate);
   }
