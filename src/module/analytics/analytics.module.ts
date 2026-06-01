@@ -12,6 +12,10 @@ import {
   ProjectSchema,
   ProjectTemplate,
 } from '../project/persistence/project.schema';
+import {
+  TaskSchema,
+  TaskSchemaTemplate,
+} from '../task/persistence/task.schema';
 import { UserSchema, UserTemplate } from '../auth/users/user.schema';
 
 @Module({
@@ -21,6 +25,7 @@ import { UserSchema, UserTemplate } from '../auth/users/user.schema';
       { name: MoveTemplate.collectionName(), schema: MoveSchema },
       { name: ProjectTemplate.collectionName(), schema: ProjectSchema },
       { name: UserTemplate.collectionName(), schema: UserSchema },
+      { name: TaskSchemaTemplate.collectionName(), schema: TaskSchema },
     ]),
   ],
   controllers: [AnalyticsController],

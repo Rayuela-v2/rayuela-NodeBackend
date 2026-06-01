@@ -14,6 +14,8 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/role.decorator';
 import { UserRole } from '../auth/users/user.schema';
 
+import { AdminCheckinQueryDto } from '../checkin/dto/admin-checkin-query.dto';
+
 @Controller('analytics')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.Admin)
@@ -95,8 +97,9 @@ export class AnalyticsController {
   @Get('project/:projectId/community-stats')
   getCommunityStats(
     @Param('projectId') projectId: string,
+    @Query() query: AdminCheckinQueryDto,
   ): Promise<any> {
-    return this.analyticsService.getCommunityStats(projectId);
+    return this.analyticsService.getCommunityStats(projectId, query);
   }
 
   @Get('summary')

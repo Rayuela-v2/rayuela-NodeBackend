@@ -1,8 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Document, PipelineStage } from 'mongoose';
+import { Model, PipelineStage, Types } from 'mongoose';
 import { GeoUtils } from '../task/utils/geoUtils';
 import { TimeInterval } from '../task/entities/time-restriction.entity';
+import {
+  TaskSchemaTemplate,
+  TaskDocument,
+} from '../task/persistence/task.schema';
+import { AdminCheckinQueryDto } from '../checkin/dto/admin-checkin-query.dto';
 import {
   CheckInDocument,
   CheckInTemplate,
@@ -37,6 +42,9 @@ export class AnalyticsDao {
 
     @InjectModel(UserTemplate.collectionName())
     private readonly userModel: Model<UserDocument>,
+
+    @InjectModel(TaskSchemaTemplate.collectionName())
+    private readonly taskModel: Model<TaskDocument>,
   ) {}
 
   private buildDateBucket(granularity: Granularity, field: string) {
@@ -360,31 +368,165 @@ export class AnalyticsDao {
     };
   }
 
-  async communityStats(projectId: string): Promise<any> {
+  async communityStats(
+    projectId: string,
+    query?: AdminCheckinQueryDto,
+  ): Promise<any> {
     const project = await this.projectModel.findById(projectId).exec();
     if (!project) {
       throw new NotFoundException('Project not found');
     }
 
-    const checkins = await this.checkinModel.find({ projectId }).exec();
+    const mongoFilter: any = { projectId };
+
+    if (query) {
+      if (query.taskType && query.taskType.trim().length > 0) {
+        mongoFilter.taskType = query.taskType.trim();
+      }
+
+      if (query.userId && query.userId.trim().length > 0) {
+        mongoFilter.userId = query.userId.trim();
+      }
+
+      if (query.badgeName && query.badgeName.trim().length > 0) {
+        const moves = await this.moveModel
+          .find({ newBadges: query.badgeName.trim() })
+          .exec();
+        const checkinIdIn = moves.map((m) => m.checkinId);
+        if (checkinIdIn.length === 0) {
+          return { byArea: [], byTaskType: [], byInterval: [] };
+        }
+        mongoFilter._id = { $in: checkinIdIn };
+      }
+
+      if (query.taskName && query.taskName.trim().length > 0) {
+        const needle = query.taskName.trim().toLowerCase();
+        let projIdObj: any;
+        try {
+          projIdObj = new Types.ObjectId(projectId);
+        } catch {
+          projIdObj = projectId;
+        }
+        const tasks = await this.taskModel
+          .find({ projectId: projIdObj })
+          .exec();
+        const taskIdIn = tasks
+          .filter(
+            (t) =>
+              (t.name && t.name.toLowerCase().includes(needle)) ||
+              (t.description && t.description.toLowerCase().includes(needle)),
+          )
+          .map((t) => t._id.toString());
+        if (taskIdIn.length === 0) {
+          return { byArea: [], byTaskType: [], byInterval: [] };
+        }
+        mongoFilter.contributesTo = { $in: taskIdIn };
+      } else if (query.contributed === 'true') {
+        mongoFilter.contributesTo = { $nin: [null, ''] };
+      } else if (query.contributed === 'false') {
+        mongoFilter.$or = [
+          { contributesTo: { $exists: false } },
+          { contributesTo: null },
+          { contributesTo: '' },
+        ];
+      }
+
+      if (query.hasPhotos === 'true') {
+        mongoFilter['imageRefs.0'] = { $exists: true };
+      } else if (query.hasPhotos === 'false') {
+        mongoFilter.$and = [
+          ...((mongoFilter.$and as object[]) || []),
+          {
+            $or: [
+              { imageRefs: { $exists: false } },
+              { imageRefs: { $size: 0 } },
+            ],
+          },
+        ];
+      }
+
+      if (query.dateFrom || query.dateTo) {
+        mongoFilter.datetime = {};
+        if (query.dateFrom) {
+          mongoFilter.datetime.$gte = new Date(query.dateFrom);
+        }
+        if (query.dateTo) {
+          const end = new Date(query.dateTo);
+          end.setUTCHours(23, 59, 59, 999);
+          mongoFilter.datetime.$lte = end;
+        }
+      }
+    }
+
+    let checkins = await this.checkinModel.find(mongoFilter).exec();
+
+    if (query && query.latitude && query.longitude && query.radiusKm) {
+      const centerLat = parseFloat(query.latitude);
+      const centerLng = parseFloat(query.longitude);
+      const radiusKm = parseFloat(query.radiusKm);
+      if (
+        !Number.isNaN(centerLat) &&
+        !Number.isNaN(centerLng) &&
+        !Number.isNaN(radiusKm) &&
+        radiusKm > 0
+      ) {
+        checkins = checkins.filter((c) =>
+          AnalyticsDao.withinRadius(
+            Number(c.latitude),
+            Number(c.longitude),
+            centerLat,
+            centerLng,
+            radiusKm,
+          ),
+        );
+      }
+    }
+
     const checkinIds = checkins.map((c) => c._id.toString());
-    const moves = await this.moveModel.find({ checkinId: { $in: checkinIds } }).exec();
+    const moves = await this.moveModel
+      .find({ checkinId: { $in: checkinIds } })
+      .exec();
     const moveByCheckinId = new Map<string, any>(
       moves.map((m) => [m.checkinId, m]),
     );
 
     const areas = project.areas?.features || [];
     const intervals = (project.timeIntervals || []).map(
-      (ti) => new TimeInterval(ti.name, ti.days, ti.time, new Date(ti.startDate), new Date(ti.endDate)),
+      (ti) =>
+        new TimeInterval(
+          ti.name,
+          ti.days,
+          ti.time,
+          new Date(ti.startDate),
+          new Date(ti.endDate),
+        ),
     );
 
-    const areaStatsMap = new Map<string, { areaName: string; checkinsCount: number; totalPoints: number; totalBadges: number }>();
+    const areaStatsMap = new Map<
+      string,
+      {
+        areaName: string;
+        checkinsCount: number;
+        totalPoints: number;
+        totalBadges: number;
+      }
+    >();
     for (const area of areas) {
       const areaId = area.properties.id || area.properties.name || 'Unknown';
       const areaName = area.properties.name || areaId;
-      areaStatsMap.set(areaId.toString(), { areaName, checkinsCount: 0, totalPoints: 0, totalBadges: 0 });
+      areaStatsMap.set(areaId.toString(), {
+        areaName,
+        checkinsCount: 0,
+        totalPoints: 0,
+        totalBadges: 0,
+      });
     }
-    areaStatsMap.set('Outside Area', { areaName: 'Fuera de Área', checkinsCount: 0, totalPoints: 0, totalBadges: 0 });
+    areaStatsMap.set('Outside Area', {
+      areaName: 'Fuera de Área',
+      checkinsCount: 0,
+      totalPoints: 0,
+      totalBadges: 0,
+    });
 
     const taskTypeStatsMap = new Map<string, number>();
     const intervalStatsMap = new Map<string, number>();
@@ -397,7 +539,13 @@ export class AnalyticsDao {
       let matchedAreaId = 'Outside Area';
       for (const area of areas) {
         const areaId = area.properties.id || area.properties.name || 'Unknown';
-        if (GeoUtils.isPointInPolygon(parseFloat(ch.longitude), parseFloat(ch.latitude), area.geometry)) {
+        if (
+          GeoUtils.isPointInPolygon(
+            parseFloat(ch.longitude),
+            parseFloat(ch.latitude),
+            area.geometry,
+          )
+        ) {
           matchedAreaId = areaId.toString();
           break;
         }
@@ -420,22 +568,50 @@ export class AnalyticsDao {
           break;
         }
       }
-      intervalStatsMap.set(matchedInterval, (intervalStatsMap.get(matchedInterval) || 0) + 1);
+      intervalStatsMap.set(
+        matchedInterval,
+        (intervalStatsMap.get(matchedInterval) || 0) + 1,
+      );
     }
 
     const byArea = Array.from(areaStatsMap.entries()).map(([areaId, val]) => ({
       areaId,
       ...val,
     }));
-    const byTaskType = Array.from(taskTypeStatsMap.entries()).map(([taskType, checkinsCount]) => ({
-      taskType,
-      checkinsCount,
-    }));
-    const byInterval = Array.from(intervalStatsMap.entries()).map(([timeIntervalId, checkinsCount]) => ({
-      timeIntervalId,
-      checkinsCount,
-    }));
+    const byTaskType = Array.from(taskTypeStatsMap.entries()).map(
+      ([taskType, checkinsCount]) => ({
+        taskType,
+        checkinsCount,
+      }),
+    );
+    const byInterval = Array.from(intervalStatsMap.entries()).map(
+      ([timeIntervalId, checkinsCount]) => ({
+        timeIntervalId,
+        checkinsCount,
+      }),
+    );
 
     return { byArea, byTaskType, byInterval };
+  }
+
+  private static withinRadius(
+    lat: number,
+    lng: number,
+    centerLat: number,
+    centerLng: number,
+    radiusKm: number,
+  ): boolean {
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return false;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat - centerLat);
+    const dLng = toRad(lng - centerLng);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(centerLat)) *
+        Math.cos(toRad(lat)) *
+        Math.sin(dLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const EARTH_RADIUS_KM = 6371;
+    return EARTH_RADIUS_KM * c <= radiusKm;
   }
 }

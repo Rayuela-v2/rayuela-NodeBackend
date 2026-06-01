@@ -1,6 +1,6 @@
 import { User } from '../../auth/users/user.entity';
 import { Checkin } from '../entities/checkin.entity';
-import { CheckInDocument, CheckInTemplate } from './checkin.schema';
+import { CheckInTemplate } from './checkin.schema';
 
 export class CheckinMapper {
   /**
