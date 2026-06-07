@@ -7,6 +7,7 @@ This page describes the architecture, infrastructure, and continuous integration
 ```mermaid
 flowchart TB
     Browser["🌐 Browser"]
+    MobileApp["📱 Mobile App\n(rayuela-mobile APK)"]
 
     subgraph Vercel["☁️ Vercel (Frontend)"]
         VFE["rayuela-frontend\nStatic Site (SPA)"]
@@ -35,6 +36,7 @@ flowchart TB
 
     Browser -->|"HTTPS"| VFE
     VFE -->|"VITE_ROOT_API\nhttps://.../v1"| BE
+    MobileApp -->|"HTTPS\nhttps://.../v1"| BE
     BE -->|"mongodb+srv://"| DB
     BE -->|"http://garage:3900\nS3 API"| GR
 
@@ -69,6 +71,11 @@ The frontend is a Vue.js Single Page Application (SPA).
 - **Tier**: M0 (Free Tier).
 - **Cluster**: `free-mongo-cluster`.
 - **Access**: IP whitelist configured for Northflank egress IPs.
+
+### 4. Mobile Client: APK
+The mobile client (**rayuela-mobile**) is distributed as an APK package for testing.
+- **Backend Configuration**: Configured to connect directly to the Northflank rest API endpoint (`https://p01--rayuela-nodebackend--9v9rbv2pxhtx.code.run/v1`).
+- **Build configuration**: Built using `.env.northflank` environment variables.
 
 ---
 
