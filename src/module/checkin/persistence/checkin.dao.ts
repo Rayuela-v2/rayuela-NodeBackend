@@ -17,6 +17,8 @@ export interface AdminCheckinFilter {
   userId?: string;
   /** Restrict to checkin ids whose `contributesTo` matches a precomputed task id list. */
   taskIdIn?: string[];
+  /** Restrict to specific check-in IDs (e.g. filtered by unlocked badge). */
+  checkinIdIn?: string[];
   /** When `true` keep only checkins with images, `false` only those without. */
   hasPhotos?: boolean;
   /** When `true` keep only checkins that solved a task, `false` the rest. */
@@ -34,7 +36,7 @@ export interface AdminCheckinFilter {
 }
 
 export interface AdminCheckinPage {
-  items: CheckInTemplate[];
+  items: CheckInDocument[];
   total: number;
   page: number;
   limit: number;
@@ -124,6 +126,9 @@ export class CheckInDao {
     }
     if (filter.userId) {
       mongoFilter.userId = filter.userId;
+    }
+    if (filter.checkinIdIn && filter.checkinIdIn.length > 0) {
+      mongoFilter._id = { $in: filter.checkinIdIn };
     }
     // taskIdIn ⇒ implies contributed=true. We let it win over the
     // `contributed` flag to avoid producing contradictory queries.

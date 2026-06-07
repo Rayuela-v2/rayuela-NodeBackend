@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AnalyticsDao } from './analytics.dao';
 import { Granularity } from './analytics.types';
+import { AdminCheckinQueryDto } from '../checkin/dto/admin-checkin-query.dto';
 
 @Injectable()
 export class AnalyticsService {
@@ -68,6 +69,10 @@ export class AnalyticsService {
       startDate,
       endDate,
     );
+  }
+
+  getCommunityStats(projectId: string, query?: AdminCheckinQueryDto) {
+    return this.analyticsDao.communityStats(projectId, query);
   }
 
   getSummary(projectId?: string, startDate?: string, endDate?: string) {

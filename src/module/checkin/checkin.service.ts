@@ -11,6 +11,7 @@ import { Move } from './entities/move.entity';
 import { GameBuilder } from './entities/game.entity';
 import { ProjectService, UserStatus } from '../project/project.service';
 import { MoveDao } from './persistence/move.dao';
+import { MoveDocument } from './persistence/move.schema';
 import { GamificationService } from '../gamification/gamification.service';
 import { Project } from '../project/entities/project';
 import { User } from '../auth/users/user.entity';
@@ -233,6 +234,15 @@ export class CheckinService {
     );
     const page = Math.max(1, parseIntSafe(query.page, 1));
 
+    let checkinIdIn: string[] | undefined;
+    if (query.badgeName && query.badgeName.trim().length > 0) {
+      const moves = await this.moveDao.findMovesByBadge(query.badgeName.trim());
+      checkinIdIn = moves.map((m) => m.checkinId);
+      if (checkinIdIn.length === 0) {
+        return { items: [], total: 0, page, limit };
+      }
+    }
+
     let taskIdIn: string[] | undefined;
     let projectTasks: Task[] | null = null;
     if (query.taskName && query.taskName.trim().length > 0) {
@@ -256,6 +266,7 @@ export class CheckinService {
       taskType: query.taskType?.trim() || undefined,
       userId: query.userId?.trim() || undefined,
       taskIdIn,
+      checkinIdIn,
       hasPhotos: parseBool(query.hasPhotos),
       contributed: parseBool(query.contributed),
       dateFrom: parseDate(query.dateFrom),
@@ -272,7 +283,12 @@ export class CheckinService {
 
     // Skip the task-enrichment DB call when there is nothing to enrich.
     if (result.items.length === 0) {
-      return { items: [], total: result.total, page: result.page, limit: result.limit };
+      return {
+        items: [],
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+      };
     }
 
     // Build an id→task map once so the response can include task name + type.
@@ -282,15 +298,25 @@ export class CheckinService {
     const taskById = new Map<string, Task>(
       projectTasks.map((t) => [t.getId().toString(), t]),
     );
-    const items = result.items.map((c: any) => {
+
+    const checkinIds = result.items.map((c) => c._id.toString());
+    const moves = await this.moveDao.findMovesByCheckinIds(checkinIds);
+    const moveByCheckinId = new Map<string, MoveDocument>(
+      moves.map((m) => [m.checkinId, m]),
+    );
+
+    const items = result.items.map((c) => {
       const plain = typeof c.toObject === 'function' ? c.toObject() : c;
       const task = plain.contributesTo
         ? taskById.get(plain.contributesTo.toString())
         : undefined;
+      const move = moveByCheckinId.get(plain._id.toString());
       return {
         ...plain,
         taskName: task?.name || null,
         taskDescription: task?.description || null,
+        newPoints: move?.newPoints || 0,
+        newBadges: move?.newBadges || [],
       };
     });
 

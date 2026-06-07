@@ -7,7 +7,6 @@ import { Stream } from 'stream';
 
 describe('StorageController', () => {
   let controller: StorageController;
-  let service: StorageService;
 
   const mockStorageService = {
     getFile: jest.fn(),
@@ -25,7 +24,6 @@ describe('StorageController', () => {
     }).compile();
 
     controller = module.get<StorageController>(StorageController);
-    service = module.get<StorageService>(StorageService);
   });
 
   it('should be defined', () => {

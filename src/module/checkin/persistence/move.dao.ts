@@ -50,6 +50,14 @@ export class MoveDao {
     }
   }
 
+  async findMovesByBadge(badgeName: string): Promise<MoveDocument[]> {
+    return this.moveModel.find({ newBadges: badgeName }).exec();
+  }
+
+  async findMovesByCheckinIds(checkinIds: string[]): Promise<MoveDocument[]> {
+    return this.moveModel.find({ checkinId: { $in: checkinIds } }).exec();
+  }
+
   /**
    * Mapea la entidad `Move` al formato del esquema de base de datos `MoveTemplate`.
    */

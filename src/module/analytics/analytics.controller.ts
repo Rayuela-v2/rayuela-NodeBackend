@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import {
   ActiveUsersSeries,
@@ -13,6 +13,8 @@ import { JwtAuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/role.decorator';
 import { UserRole } from '../auth/users/user.schema';
+
+import { AdminCheckinQueryDto } from '../checkin/dto/admin-checkin-query.dto';
 
 @Controller('analytics')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -90,6 +92,14 @@ export class AnalyticsController {
       startDate,
       endDate,
     );
+  }
+
+  @Get('project/:projectId/community-stats')
+  getCommunityStats(
+    @Param('projectId') projectId: string,
+    @Query() query: AdminCheckinQueryDto,
+  ): Promise<any> {
+    return this.analyticsService.getCommunityStats(projectId, query);
   }
 
   @Get('summary')

@@ -7,7 +7,6 @@ jest.mock('@aws-sdk/client-s3');
 
 describe('StorageService', () => {
   let service: StorageService;
-  let configService: ConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -26,7 +25,6 @@ describe('StorageService', () => {
     }).compile();
 
     service = module.get<StorageService>(StorageService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined', () => {

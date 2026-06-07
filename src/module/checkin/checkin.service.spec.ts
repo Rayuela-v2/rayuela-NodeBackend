@@ -38,6 +38,8 @@ const mockStorageService = {
 
 const mockMoveDao = {
   create: jest.fn(),
+  findMovesByCheckinIds: jest.fn().mockResolvedValue([]),
+  findMovesByBadge: jest.fn().mockResolvedValue([]),
 };
 
 const mockTaskService = {
