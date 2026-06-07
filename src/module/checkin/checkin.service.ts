@@ -11,6 +11,7 @@ import { Move } from './entities/move.entity';
 import { GameBuilder } from './entities/game.entity';
 import { ProjectService, UserStatus } from '../project/project.service';
 import { MoveDao } from './persistence/move.dao';
+import { MoveDocument } from './persistence/move.schema';
 import { GamificationService } from '../gamification/gamification.service';
 import { Project } from '../project/entities/project';
 import { User } from '../auth/users/user.entity';
@@ -298,13 +299,13 @@ export class CheckinService {
       projectTasks.map((t) => [t.getId().toString(), t]),
     );
 
-    const checkinIds = result.items.map((c: any) => c._id.toString());
+    const checkinIds = result.items.map((c) => c._id.toString());
     const moves = await this.moveDao.findMovesByCheckinIds(checkinIds);
-    const moveByCheckinId = new Map<string, any>(
+    const moveByCheckinId = new Map<string, MoveDocument>(
       moves.map((m) => [m.checkinId, m]),
     );
 
-    const items = result.items.map((c: any) => {
+    const items = result.items.map((c) => {
       const plain = typeof c.toObject === 'function' ? c.toObject() : c;
       const task = plain.contributesTo
         ? taskById.get(plain.contributesTo.toString())

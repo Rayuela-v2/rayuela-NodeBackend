@@ -36,7 +36,7 @@ export interface AdminCheckinFilter {
 }
 
 export interface AdminCheckinPage {
-  items: CheckInTemplate[];
+  items: CheckInDocument[];
   total: number;
   page: number;
   limit: number;

@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, PipelineStage, Types } from 'mongoose';
+import {
+  FilterQuery,
+  HydratedDocument,
+  Model,
+  PipelineStage,
+  Types,
+} from 'mongoose';
 import { GeoUtils } from '../task/utils/geoUtils';
 import { TimeInterval } from '../task/entities/time-restriction.entity';
 import {
@@ -20,11 +26,15 @@ import {
 import { UserDocument, UserTemplate } from '../auth/users/user.schema';
 import {
   ActiveUsersSeries,
+  AreaStat,
+  CommunityStats,
   ContributionRate,
   Granularity,
+  IntervalStat,
   PointsSeries,
   StrategyBreakdown,
   SummaryStats,
+  TaskTypeStat,
   TimeSeries,
 } from './analytics.types';
 
@@ -368,128 +378,201 @@ export class AnalyticsDao {
     };
   }
 
+  /**
+   * Builds community-level statistics for a project's check-ins, grouped by
+   * area, task type and time interval. Each group reports the check-in count,
+   * and areas also accumulate the points and badges awarded by the related
+   * `Move`.
+   *
+   * `query` carries the optional admin filters (badge, task name/type, user,
+   * photos, contribution, date range and geo radius). It is bound by NestJS
+   * from the query string of `GET /analytics/project/:projectId/community-stats`
+   * (`@Query() query: AdminCheckinQueryDto` in `AnalyticsController`); the DTO is
+   * the same one used by the admin check-in listing endpoint.
+   *
+   * The work is split into helpers: `buildCommunityStatsFilter` turns the query
+   * into a Mongo filter, `applyGeoRadiusFilter` narrows results to a geographic
+   * radius in memory, and `buildCommunityStatsResult` performs the aggregation.
+   */
   async communityStats(
     projectId: string,
     query?: AdminCheckinQueryDto,
-  ): Promise<any> {
+  ): Promise<CommunityStats> {
     const project = await this.projectModel.findById(projectId).exec();
     if (!project) {
       throw new NotFoundException('Project not found');
     }
 
-    const mongoFilter: any = { projectId };
-
-    if (query) {
-      if (query.taskType && query.taskType.trim().length > 0) {
-        mongoFilter.taskType = query.taskType.trim();
-      }
-
-      if (query.userId && query.userId.trim().length > 0) {
-        mongoFilter.userId = query.userId.trim();
-      }
-
-      if (query.badgeName && query.badgeName.trim().length > 0) {
-        const moves = await this.moveModel
-          .find({ newBadges: query.badgeName.trim() })
-          .exec();
-        const checkinIdIn = moves.map((m) => m.checkinId);
-        if (checkinIdIn.length === 0) {
-          return { byArea: [], byTaskType: [], byInterval: [] };
-        }
-        mongoFilter._id = { $in: checkinIdIn };
-      }
-
-      if (query.taskName && query.taskName.trim().length > 0) {
-        const needle = query.taskName.trim().toLowerCase();
-        let projIdObj: any;
-        try {
-          projIdObj = new Types.ObjectId(projectId);
-        } catch {
-          projIdObj = projectId;
-        }
-        const tasks = await this.taskModel
-          .find({ projectId: projIdObj })
-          .exec();
-        const taskIdIn = tasks
-          .filter(
-            (t) =>
-              (t.name && t.name.toLowerCase().includes(needle)) ||
-              (t.description && t.description.toLowerCase().includes(needle)),
-          )
-          .map((t) => t._id.toString());
-        if (taskIdIn.length === 0) {
-          return { byArea: [], byTaskType: [], byInterval: [] };
-        }
-        mongoFilter.contributesTo = { $in: taskIdIn };
-      } else if (query.contributed === 'true') {
-        mongoFilter.contributesTo = { $nin: [null, ''] };
-      } else if (query.contributed === 'false') {
-        mongoFilter.$or = [
-          { contributesTo: { $exists: false } },
-          { contributesTo: null },
-          { contributesTo: '' },
-        ];
-      }
-
-      if (query.hasPhotos === 'true') {
-        mongoFilter['imageRefs.0'] = { $exists: true };
-      } else if (query.hasPhotos === 'false') {
-        mongoFilter.$and = [
-          ...((mongoFilter.$and as object[]) || []),
-          {
-            $or: [
-              { imageRefs: { $exists: false } },
-              { imageRefs: { $size: 0 } },
-            ],
-          },
-        ];
-      }
-
-      if (query.dateFrom || query.dateTo) {
-        mongoFilter.datetime = {};
-        if (query.dateFrom) {
-          mongoFilter.datetime.$gte = new Date(query.dateFrom);
-        }
-        if (query.dateTo) {
-          const end = new Date(query.dateTo);
-          end.setUTCHours(23, 59, 59, 999);
-          mongoFilter.datetime.$lte = end;
-        }
-      }
+    const { filter, hasNoResults } = await this.buildCommunityStatsFilter(
+      projectId,
+      query,
+    );
+    if (hasNoResults) {
+      return { byArea: [], byTaskType: [], byInterval: [] };
     }
 
-    let checkins = await this.checkinModel.find(mongoFilter).exec();
-
-    if (query && query.latitude && query.longitude && query.radiusKm) {
-      const centerLat = parseFloat(query.latitude);
-      const centerLng = parseFloat(query.longitude);
-      const radiusKm = parseFloat(query.radiusKm);
-      if (
-        !Number.isNaN(centerLat) &&
-        !Number.isNaN(centerLng) &&
-        !Number.isNaN(radiusKm) &&
-        radiusKm > 0
-      ) {
-        checkins = checkins.filter((c) =>
-          AnalyticsDao.withinRadius(
-            Number(c.latitude),
-            Number(c.longitude),
-            centerLat,
-            centerLng,
-            radiusKm,
-          ),
-        );
-      }
-    }
+    let checkins = await this.checkinModel.find(filter).exec();
+    checkins = AnalyticsDao.applyGeoRadiusFilter(checkins, query);
 
     const checkinIds = checkins.map((c) => c._id.toString());
     const moves = await this.moveModel
       .find({ checkinId: { $in: checkinIds } })
       .exec();
-    const moveByCheckinId = new Map<string, any>(
+    const moveByCheckinId = new Map<string, MoveDocument>(
       moves.map((m) => [m.checkinId, m]),
     );
 
+    return this.buildCommunityStatsResult(project, checkins, moveByCheckinId);
+  }
+
+  /**
+   * Translates the admin query filters into a Mongo filter for check-ins.
+   *
+   * Returns `hasNoResults: true` when a filter (badge or task name) matches
+   * nothing, so the caller can short-circuit with an empty response instead of
+   * running a query that can never match.
+   */
+  private async buildCommunityStatsFilter(
+    projectId: string,
+    query?: AdminCheckinQueryDto,
+  ): Promise<{ filter: FilterQuery<CheckInDocument>; hasNoResults: boolean }> {
+    const filter: FilterQuery<CheckInDocument> = { projectId };
+
+    if (!query) {
+      return { filter, hasNoResults: false };
+    }
+
+    if (query.taskType && query.taskType.trim().length > 0) {
+      filter.taskType = query.taskType.trim();
+    }
+
+    if (query.userId && query.userId.trim().length > 0) {
+      filter.userId = query.userId.trim();
+    }
+
+    if (query.badgeName && query.badgeName.trim().length > 0) {
+      const moves = await this.moveModel
+        .find({ newBadges: query.badgeName.trim() })
+        .exec();
+      const checkinIdIn = moves.map((m) => m.checkinId);
+      if (checkinIdIn.length === 0) {
+        return { filter, hasNoResults: true };
+      }
+      filter._id = { $in: checkinIdIn };
+    }
+
+    if (query.taskName && query.taskName.trim().length > 0) {
+      const taskIdIn = await this.findTaskIdsByName(projectId, query.taskName);
+      if (taskIdIn.length === 0) {
+        return { filter, hasNoResults: true };
+      }
+      filter.contributesTo = { $in: taskIdIn };
+    } else if (query.contributed === 'true') {
+      filter.contributesTo = { $nin: [null, ''] };
+    } else if (query.contributed === 'false') {
+      filter.$or = [
+        { contributesTo: { $exists: false } },
+        { contributesTo: null },
+        { contributesTo: '' },
+      ];
+    }
+
+    if (query.hasPhotos === 'true') {
+      filter['imageRefs.0'] = { $exists: true };
+    } else if (query.hasPhotos === 'false') {
+      filter.$and = [
+        ...((filter.$and as object[]) || []),
+        {
+          $or: [{ imageRefs: { $exists: false } }, { imageRefs: { $size: 0 } }],
+        },
+      ];
+    }
+
+    if (query.dateFrom || query.dateTo) {
+      const datetime: { $gte?: Date; $lte?: Date } = {};
+      if (query.dateFrom) {
+        datetime.$gte = new Date(query.dateFrom);
+      }
+      if (query.dateTo) {
+        const end = new Date(query.dateTo);
+        end.setUTCHours(23, 59, 59, 999);
+        datetime.$lte = end;
+      }
+      filter.datetime = datetime;
+    }
+
+    return { filter, hasNoResults: false };
+  }
+
+  /**
+   * Resolves the ids of a project's tasks whose name or description contains
+   * `taskName` (case-insensitive, partial match). The match is pushed down to
+   * Mongo so we don't load every project task into memory.
+   */
+  private async findTaskIdsByName(
+    projectId: string,
+    taskName: string,
+  ): Promise<string[]> {
+    let projIdObj: Types.ObjectId | string;
+    try {
+      projIdObj = new Types.ObjectId(projectId);
+    } catch {
+      projIdObj = projectId;
+    }
+    const rx = new RegExp(AnalyticsDao.escapeRegExp(taskName.trim()), 'i');
+    const tasks = await this.taskModel
+      .find({ projectId: projIdObj, $or: [{ name: rx }, { description: rx }] })
+      .exec();
+    return tasks.map((t) => t._id.toString());
+  }
+
+  /** Escapes regex metacharacters so user input is matched literally. */
+  private static escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Narrows check-ins to those within `radiusKm` of the query's lat/lng centre.
+   * Returns the input unchanged when the radius filter is absent or invalid.
+   */
+  private static applyGeoRadiusFilter<
+    T extends { latitude: string; longitude: string },
+  >(checkins: T[], query?: AdminCheckinQueryDto): T[] {
+    if (!query || !query.latitude || !query.longitude || !query.radiusKm) {
+      return checkins;
+    }
+    const centerLat = parseFloat(query.latitude);
+    const centerLng = parseFloat(query.longitude);
+    const radiusKm = parseFloat(query.radiusKm);
+    if (
+      Number.isNaN(centerLat) ||
+      Number.isNaN(centerLng) ||
+      Number.isNaN(radiusKm) ||
+      radiusKm <= 0
+    ) {
+      return checkins;
+    }
+    return checkins.filter((c) =>
+      AnalyticsDao.withinRadius(
+        Number(c.latitude),
+        Number(c.longitude),
+        centerLat,
+        centerLng,
+        radiusKm,
+      ),
+    );
+  }
+
+  /**
+   * Aggregates check-ins into per-area, per-task-type and per-interval counts,
+   * attributing each check-in's points and badges (from its `Move`) to the area
+   * whose polygon contains it (or "Outside Area" when none match).
+   */
+  private buildCommunityStatsResult(
+    project: ProjectDocument,
+    checkins: HydratedDocument<CheckInDocument>[],
+    moveByCheckinId: Map<string, MoveDocument>,
+  ): CommunityStats {
     const areas = project.areas?.features || [];
     const intervals = (project.timeIntervals || []).map(
       (ti) =>
@@ -502,15 +585,7 @@ export class AnalyticsDao {
         ),
     );
 
-    const areaStatsMap = new Map<
-      string,
-      {
-        areaName: string;
-        checkinsCount: number;
-        totalPoints: number;
-        totalBadges: number;
-      }
-    >();
+    const areaStatsMap = new Map<string, Omit<AreaStat, 'areaId'>>();
     for (const area of areas) {
       const areaId = area.properties.id || area.properties.name || 'Unknown';
       const areaName = area.properties.name || areaId;
@@ -574,22 +649,18 @@ export class AnalyticsDao {
       );
     }
 
-    const byArea = Array.from(areaStatsMap.entries()).map(([areaId, val]) => ({
-      areaId,
-      ...val,
+    const byArea: AreaStat[] = Array.from(areaStatsMap.entries()).map(
+      ([areaId, val]) => ({ areaId, ...val }),
+    );
+    const byTaskType: TaskTypeStat[] = Array.from(
+      taskTypeStatsMap.entries(),
+    ).map(([taskType, checkinsCount]) => ({ taskType, checkinsCount }));
+    const byInterval: IntervalStat[] = Array.from(
+      intervalStatsMap.entries(),
+    ).map(([timeIntervalId, checkinsCount]) => ({
+      timeIntervalId,
+      checkinsCount,
     }));
-    const byTaskType = Array.from(taskTypeStatsMap.entries()).map(
-      ([taskType, checkinsCount]) => ({
-        taskType,
-        checkinsCount,
-      }),
-    );
-    const byInterval = Array.from(intervalStatsMap.entries()).map(
-      ([timeIntervalId, checkinsCount]) => ({
-        timeIntervalId,
-        checkinsCount,
-      }),
-    );
 
     return { byArea, byTaskType, byInterval };
   }

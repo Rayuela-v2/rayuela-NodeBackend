@@ -42,3 +42,31 @@ export interface SummaryStats {
   totalBadgesEarned: number;
   totalPointsAwarded: number;
 }
+
+/** Per-area aggregation row returned by `communityStats`. */
+export interface AreaStat {
+  areaId: string;
+  areaName: string;
+  checkinsCount: number;
+  totalPoints: number;
+  totalBadges: number;
+}
+
+/** Per-task-type aggregation row returned by `communityStats`. */
+export interface TaskTypeStat {
+  taskType: string;
+  checkinsCount: number;
+}
+
+/** Per-time-interval aggregation row returned by `communityStats`. */
+export interface IntervalStat {
+  timeIntervalId: string;
+  checkinsCount: number;
+}
+
+/** Shape of the community-stats endpoint response. */
+export interface CommunityStats {
+  byArea: AreaStat[];
+  byTaskType: TaskTypeStat[];
+  byInterval: IntervalStat[];
+}
