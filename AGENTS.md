@@ -9,11 +9,11 @@ Rayuela is a full-stack citizen science platform with adaptive gamification for 
 - `rayuela-NodeBackend/` — NestJS + TypeScript REST API (MongoDB + Garage S3)
 - `rayuela-frontend/` — Vue 3 + Vite SPA (Vuetify + Vuex)
 
-**GitHub Project:** [Rayuela Workspace Board](https://github.com/users/lucas-matw-unq/projects/1)
+**GitHub Project:** [Rayuela Workspace Board](https://github.com/orgs/Rayuela-v2/projects/1/views/1)
 
 ## Mandatory Development Rules
-- **FORKED REPOS ONLY:** ALWAYS work exclusively in the forked repositories under the `lucas-matw-unq` account. NEVER perform actions in `cientopolis` source repositories.
-- **ISSUE TRACKING:** All issues are tracked in: [lucas-matw-unq/rayuela-NodeBackend](https://github.com/lucas-matw-unq/rayuela-NodeBackend)
+- **ORG REPOSITORIES:** ALWAYS work exclusively in the repositories under the `Rayuela-v2` organization. NEVER perform actions in `cientopolis` source repositories.
+- **ISSUE TRACKING:** All issues are tracked in: [Rayuela-v2/rayuela-NodeBackend](https://github.com/Rayuela-v2/rayuela-NodeBackend)
 - **NO AI SIGNATURES:** Do not include agent signatures or attribution lines in PR descriptions or commits.
 
 ## Development Commands

@@ -23,9 +23,14 @@ flowchart TB
         end
     end
 
-    subgraph GitHub["🐙 GitHub (lucas-matw-unq)"]
-        REPO_BE["rayuela-NodeBackend\nbranch: main"]
-        REPO_FE["rayuela-frontend"]
+    subgraph GitHub["🐙 GitHub"]
+        subgraph Org["Rayuela-v2 (Org)"]
+            REPO_BE["rayuela-NodeBackend\nbranch: main"]
+            REPO_FE_ORG["rayuela-frontend\nbranch: main"]
+        end
+        subgraph Pers["lucas-matw-unq (Personal Fork)"]
+            REPO_FE_PERS["rayuela-frontend\nbranch: main"]
+        end
     end
 
     Browser -->|"HTTPS"| VFE
@@ -33,8 +38,9 @@ flowchart TB
     BE -->|"mongodb+srv://"| DB
     BE -->|"http://garage:3900\nS3 API"| GR
 
-    REPO_BE -->|"CI build → deploy"| BE
-    REPO_FE -->|"CI deploy"| VFE
+    REPO_BE -->|"Direct CI/CD Build & Deploy"| BE
+    REPO_FE_ORG -->|"Sync Action (sync-personal-fork.yml)"| REPO_FE_PERS
+    REPO_FE_PERS -->|"Automatic Deploy"| VFE
 ```
 
 ## Core Infrastructure
