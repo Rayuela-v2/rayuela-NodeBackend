@@ -32,8 +32,8 @@ export class ProjectTemplate {
   @Prop({ type: MongooseSchema.Types.Mixed, default: {} }) // Permite cualquier tipo
   areas: any;
 
-  @Prop({ type: [String], default: [] })
-  taskTypes: string[];
+  @Prop({ type: [MongooseSchema.Types.Mixed], default: [] })
+  taskTypes: any[];
 
   @Prop({ default: GamificationStrategy.BASIC })
   gamificationStrategy: string;

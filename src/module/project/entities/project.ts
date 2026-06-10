@@ -16,7 +16,7 @@ export class Project {
     web: string,
     available: boolean,
     areas: FeatureCollection,
-    taskTypes: string[],
+    taskTypes: any[],
     timeIntervals: TimeInterval[],
     ownerId: string,
     gamification: Gamification,
@@ -49,7 +49,7 @@ export class Project {
   web: string;
   available: boolean;
   areas: FeatureCollection;
-  taskTypes: string[];
+  taskTypes: any[];
   timeIntervals: TimeInterval[];
   ownerId: string;
   gamification: Gamification;

@@ -77,7 +77,8 @@ export class ProjectService {
     }
     const combinations = [];
     project.areas.features.map((area) => {
-      project.taskTypes.forEach((type) => {
+      project.taskTypes.forEach((typeObj) => {
+        const typeName = typeof typeObj === 'string' ? typeObj : typeObj.name;
         project.timeIntervals.forEach((timeInterval) => {
           combinations.push([
             {
@@ -87,7 +88,7 @@ export class ProjectService {
               projectId: id,
               timeInterval,
               area,
-              type,
+              type: typeName,
             },
           ]);
         });

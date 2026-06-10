@@ -34,10 +34,13 @@ export class BasicBadgeEngine implements BadgeEngine {
   }
 
   private matchTaskType(r: BadgeRule, checkin: Checkin, project: Project) {
+    const taskTypeNames = (project.taskTypes || []).map((t) =>
+      typeof t === 'string' ? t : t?.name,
+    );
     return (
       r.taskType === 'Cualquiera' ||
       (checkin.taskType === r.taskType &&
-        project.taskTypes.includes(r.taskType))
+        taskTypeNames.includes(r.taskType))
     );
   }
 
