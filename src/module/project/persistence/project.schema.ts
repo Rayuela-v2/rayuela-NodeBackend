@@ -6,6 +6,7 @@ import {
   LeaderboardStrategy,
   RecommendationStrategy,
 } from '../dto/create-project.dto';
+import { TaskTypeValue } from '../entities/task-type';
 
 export type ProjectDocument = ProjectTemplate & Document;
 
@@ -32,8 +33,10 @@ export class ProjectTemplate {
   @Prop({ type: MongooseSchema.Types.Mixed, default: {} }) // Permite cualquier tipo
   areas: any;
 
+  // Mixed: persists both the legacy `string` form and the `{ name, description }`
+  // object form. See TaskTypeValue.
   @Prop({ type: [MongooseSchema.Types.Mixed], default: [] })
-  taskTypes: any[];
+  taskTypes: TaskTypeValue[];
 
   @Prop({ default: GamificationStrategy.BASIC })
   gamificationStrategy: string;

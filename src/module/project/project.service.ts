@@ -5,6 +5,7 @@ import { ProjectTemplate } from './persistence/project.schema';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UserService } from '../auth/users/user.service';
 import { Project } from './entities/project';
+import { getTaskTypeName } from './entities/task-type';
 import { BadgeRule } from '../gamification/entities/gamification.entity';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
 import { Leaderboard } from '../leaderboard/persistence/leaderboard-user-schema';
@@ -78,7 +79,7 @@ export class ProjectService {
     const combinations = [];
     project.areas.features.map((area) => {
       project.taskTypes.forEach((typeObj) => {
-        const typeName = typeof typeObj === 'string' ? typeObj : typeObj.name;
+        const typeName = getTaskTypeName(typeObj);
         project.timeIntervals.forEach((timeInterval) => {
           combinations.push([
             {

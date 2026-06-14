@@ -7,6 +7,7 @@ import { BadRequestException } from '@nestjs/common';
 import { TimeInterval } from '../../../../task/entities/time-restriction.entity';
 import { GeoUtils } from '../../../../task/utils/geoUtils';
 import { GamificationStrategy } from '../../../../project/dto/create-project.dto';
+import { getTaskTypeName } from '../../../../project/entities/task-type';
 
 export class BasicBadgeEngine implements BadgeEngine {
   assignableTo(project: Project): boolean {
@@ -34,13 +35,10 @@ export class BasicBadgeEngine implements BadgeEngine {
   }
 
   private matchTaskType(r: BadgeRule, checkin: Checkin, project: Project) {
-    const taskTypeNames = (project.taskTypes || []).map((t) =>
-      typeof t === 'string' ? t : t?.name,
-    );
+    const taskTypeNames = (project.taskTypes || []).map(getTaskTypeName);
     return (
       r.taskType === 'Cualquiera' ||
-      (checkin.taskType === r.taskType &&
-        taskTypeNames.includes(r.taskType))
+      (checkin.taskType === r.taskType && taskTypeNames.includes(r.taskType))
     );
   }
 
