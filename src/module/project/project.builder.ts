@@ -7,6 +7,7 @@ import {
   LeaderboardStrategy,
   RecommendationStrategy,
 } from './dto/create-project.dto';
+import { TaskTypeValue } from './entities/task-type';
 
 class ProjectBuilder {
   private id: string;
@@ -16,7 +17,7 @@ class ProjectBuilder {
   private web: string;
   private available: boolean;
   private areas: FeatureCollection;
-  private taskTypes: string[];
+  private taskTypes: TaskTypeValue[];
   private timeIntervals: TimeInterval[];
   private ownerId: string;
   private gamification: Gamification;
@@ -78,7 +79,7 @@ class ProjectBuilder {
     return this;
   }
 
-  withTaskTypes(taskTypes: string[]): this {
+  withTaskTypes(taskTypes: TaskTypeValue[]): this {
     this.taskTypes = taskTypes;
     return this;
   }

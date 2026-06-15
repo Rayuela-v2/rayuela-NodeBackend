@@ -1,4 +1,5 @@
 import { TimeInterval } from '../../task/entities/time-restriction.entity';
+import { TaskTypeValue } from '../entities/task-type';
 
 export enum GamificationStrategy {
   BASIC = 'SIN ADAPTACION',
@@ -23,7 +24,7 @@ export class CreateProjectDto {
   available: boolean;
   manualLocation: boolean;
   areas: FeatureCollection;
-  taskTypes: string[];
+  taskTypes: TaskTypeValue[];
   timeIntervals: TimeInterval[];
   ownerId: string;
   gamificationStrategy?: GamificationStrategy;

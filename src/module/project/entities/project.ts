@@ -6,6 +6,7 @@ import {
   LeaderboardStrategy,
   RecommendationStrategy,
 } from '../dto/create-project.dto';
+import { TaskTypeValue } from './task-type';
 
 export class Project {
   constructor(
@@ -16,7 +17,7 @@ export class Project {
     web: string,
     available: boolean,
     areas: FeatureCollection,
-    taskTypes: string[],
+    taskTypes: TaskTypeValue[],
     timeIntervals: TimeInterval[],
     ownerId: string,
     gamification: Gamification,
@@ -49,7 +50,7 @@ export class Project {
   web: string;
   available: boolean;
   areas: FeatureCollection;
-  taskTypes: string[];
+  taskTypes: TaskTypeValue[];
   timeIntervals: TimeInterval[];
   ownerId: string;
   gamification: Gamification;
