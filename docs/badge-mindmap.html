@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rayuela Gamification & Badges Mind Map</title>
+  
+  <!-- Font and Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Vis.js Network CDN -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --bg-card: rgba(17, 24, 39, 0.7);
+      --bg-input: #1f2937;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-inverse: #111827;
+      
+      /* Glow/Theme Colors */
+      --color-badge: #ffd700;
+      --color-badge-rgb: 255, 215, 0;
+      
+      --color-project: #10b981;
+      --color-project-rgb: 16, 185, 129;
+      
+      --color-user: #00e5ff;
+      --color-user-rgb: 0, 229, 255;
+      
+      --color-task: #d500f9;
+      --color-task-rgb: 213, 0, 249;
+      
+      --color-checkin: #ff1744;
+      --color-checkin-rgb: 255, 23, 68;
+      
+      --color-spatiotemporal: #7c4dff;
+      --color-spatiotemporal-rgb: 124, 77, 255;
+      
+      --color-engine: #f59e0b;
+      --color-engine-rgb: 245, 158, 11;
+      
+      --glass-blur: blur(16px);
+      --shadow-glow: 0 0 20px rgba(var(--color-badge-rgb), 0.15);
+      --transition-speed: 0.3s;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(var(--color-user-rgb), 0.03) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(var(--color-badge-rgb), 0.04) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(var(--color-task-rgb), 0.03) 0px, transparent 50%);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header styling */
+    header {
+      background: rgba(11, 15, 25, 0.8);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, var(--color-badge), var(--color-engine));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 8px rgba(var(--color-badge-rgb), 0.4));
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(to right, #ffffff, var(--text-muted));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.1rem;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .badge-pill {
+      background: rgba(var(--color-badge-rgb), 0.1);
+      border: 1px solid rgba(var(--color-badge-rgb), 0.2);
+      color: var(--color-badge);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Main Container */
+    .app-container {
+      display: flex;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Toolbar Panel */
+    .control-deck {
+      position: absolute;
+      top: 1.5rem;
+      left: 1.5rem;
+      z-index: 5;
+      width: 320px;
+      background: var(--bg-card);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.25rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      transition: transform var(--transition-speed);
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Search Input */
+    .search-box {
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.65rem 1rem 0.65rem 2.25rem;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: rgba(var(--color-user-rgb), 0.4);
+      box-shadow: 0 0 0 3px rgba(var(--color-user-rgb), 0.1);
+    }
+
+    .search-box i {
+      position: absolute;
+      left: 0.85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    /* Toggle / Segments */
+    .view-toggle {
+      display: flex;
+      background: var(--bg-input);
+      padding: 0.25rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .view-toggle button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem;
+      font-size: 0.8rem;
+      font-family: inherit;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+
+    .view-toggle button.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Filters list */
+    .filters-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.4rem 0.6rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .filter-item:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .filter-label-group {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .filter-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .filter-count {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: var(--bg-input);
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    /* Navigation Helpers */
+    .map-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .map-controls button {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.5rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .map-controls button:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Canvas Container */
+    #network-canvas {
+      flex: 1;
+      height: 100%;
+      outline: none;
+    }
+
+    /* Slide-out Sidebar (Details Panel) */
+    .details-panel {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      bottom: 1.5rem;
+      width: 420px;
+      background: var(--bg-card);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.4);
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(calc(100% + 2rem));
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .details-panel.open {
+      transform: translateX(0);
+    }
+
+    .panel-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 0.2rem;
+      transition: color 0.2s;
+    }
+
+    .close-btn:hover {
+      color: #ffffff;
+    }
+
+    .node-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      max-width: 90%;
+    }
+
+    .node-category-tag {
+      align-self: flex-start;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    .node-name {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .info-section-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .desc-text {
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--text-main);
+    }
+
+    /* Attributes Table */
+    .attributes-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .attribute-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      padding-bottom: 0.5rem;
+    }
+
+    .attr-key {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--color-badge);
+      font-weight: 500;
+    }
+
+    .attr-type {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-left: 0.4rem;
+    }
+
+    .attr-val {
+      font-size: 0.85rem;
+      color: var(--text-main);
+      padding-left: 0.2rem;
+    }
+
+    /* Code references */
+    .code-ref-card {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      text-decoration: none;
+      color: var(--text-main);
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .code-ref-card:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .code-ref-left {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      max-width: 85%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .code-ref-left i {
+      color: var(--color-user);
+    }
+
+    .code-ref-card i.fa-chevron-right {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+    }
+
+    /* Relationship flow list */
+    .relations-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .relation-item {
+      display: flex;
+      align-items: center;
+      font-size: 0.8rem;
+      gap: 0.5rem;
+    }
+
+    .relation-arrow {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+    }
+
+    .relation-verb {
+      color: var(--text-muted);
+      font-style: italic;
+      font-size: 0.75rem;
+    }
+
+    .relation-target {
+      font-weight: 600;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .relation-target:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Legend floating overlay */
+    .legend-overlay {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1.5rem;
+      z-index: 5;
+      background: var(--bg-card);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      display: flex;
+      gap: 1.25rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    /* Vis custom tooltips styling overrides */
+    div.vis-network div.vis-tooltip {
+      position: absolute;
+      visibility: hidden;
+      padding: 0.75rem 1rem;
+      background: rgba(17, 24, 39, 0.95) !important;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      color: #ffffff !important;
+      border-radius: 8px !important;
+      font-family: 'Outfit', sans-serif !important;
+      font-size: 0.8rem !important;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+      max-width: 250px;
+      pointer-events: none;
+      z-index: 999;
+      line-height: 1.4;
+    }
+
+    /* Empty state notice */
+    .no-results {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+      border: 1px dashed var(--border-color);
+    }
+
+    /* Responsive details */
+    @media (max-width: 768px) {
+      .control-deck {
+        width: calc(100% - 3rem);
+      }
+      .details-panel {
+        width: calc(100% - 3rem);
+        left: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-area">
+      <i class="fa-solid fa-award logo-icon"></i>
+      <div>
+        <h1>Rayuela Badge & Gamification Map</h1>
+        <div class="subtitle">Interactive concept explorer & schema visualizer</div>
+      </div>
+    </div>
+    
+    <div class="header-actions">
+      <div class="badge-pill">
+        <i class="fa-solid fa-gamepad"></i>
+        <span>Adaptive Gamification</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-container">
+    
+    <!-- Control Deck (Left Sidebar) -->
+    <div class="control-deck" id="controlDeck">
+      <div>
+        <div class="section-title">
+          <span>Visualization Mode</span>
+        </div>
+        <div class="view-toggle">
+          <button class="active" id="btnConcepts" onclick="switchView('concepts')">
+            <i class="fa-solid fa-circle-nodes"></i> Concepts
+          </button>
+          <button id="btnBadges" onclick="switchView('badges')">
+            <i class="fa-solid fa-sitemap"></i> Prerequisite DAG
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">
+          <span>Search Concepts</span>
+        </div>
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="searchInput" placeholder="Search node or field name..." oninput="onSearchChange()">
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">
+          <span>Filter Categories</span>
+          <button style="background:none; border:none; color:var(--color-user); font-size:0.75rem; cursor:pointer;" onclick="toggleAllFilters(true)">All</button>
+        </div>
+        <div class="filters-list" id="filtersList">
+          <!-- Loaded dynamically -->
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">
+          <span>Controls</span>
+        </div>
+        <div class="map-controls">
+          <button onclick="zoom(1.3)"><i class="fa-solid fa-plus"></i> In</button>
+          <button onclick="zoom(0.7)"><i class="fa-solid fa-minus"></i> Out</button>
+          <button onclick="resetView()"><i class="fa-solid fa-compress"></i> Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Network Canvas -->
+    <div id="network-canvas"></div>
+
+    <!-- Floating Legend overlay -->
+    <div class="legend-overlay" id="legendOverlay">
+      <!-- Loaded dynamically based on active categories -->
+    </div>
+
+    <!-- Slide-out Sidebar (Details Panel) -->
+    <div class="details-panel" id="detailsPanel">
+      <div class="panel-header">
+        <div class="node-title-group">
+          <span class="node-category-tag" id="panelCategory">Category</span>
+          <h2 class="node-name" id="panelName">Node Name</h2>
+        </div>
+        <button class="close-btn" onclick="closeDetails()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      
+      <div class="panel-body">
+        
+        <div>
+          <div class="info-section-title">
+            <i class="fa-solid fa-align-left"></i> Description
+          </div>
+          <p class="desc-text" id="panelDescription">Description of the concept goes here.</p>
+        </div>
+
+        <div id="attributesSection">
+          <div class="info-section-title">
+            <i class="fa-solid fa-table-list"></i> Key Schema Attributes
+          </div>
+          <div class="attributes-list" id="panelAttributes">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <div>
+          <div class="info-section-title">
+            <i class="fa-solid fa-network-wired"></i> Relationships
+          </div>
+          <div class="relations-list" id="panelRelationships">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <div>
+          <div class="info-section-title">
+            <i class="fa-solid fa-code"></i> Source File Code Reference
+          </div>
+          <a href="#" class="code-ref-card" id="panelCodeLink" target="_blank">
+            <div class="code-ref-left">
+              <i class="fa-solid fa-file-code"></i>
+              <span id="panelCodePath">src/module/...</span>
+            </div>
+            <i class="fa-solid fa-chevron-right"></i>
+          </a>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Data Definitions ---
+    const CATEGORIES = {
+      badge: { label: 'Badges & Rules', color: '#ffd700', border: '#d97706', rgb: '255, 215, 0' },
+      project: { label: 'Project Context', color: '#10b981', border: '#059669', rgb: '16, 185, 129' },
+      user: { label: 'User & Profile', color: '#00e5ff', border: '#0891b2', rgb: '0, 229, 255' },
+      task: { label: 'Tasks', color: '#d500f9', border: '#aa00ff', rgb: '213, 0, 249' },
+      checkin: { label: 'Check-in (Contribution)', color: '#ff1744', border: '#e11d48', rgb: '255, 23, 68' },
+      spatiotemporal: { label: 'Spatio-Temporal', color: '#7c4dff', border: '#4f46e5', rgb: '124, 77, 255' },
+      engine: { label: 'Engine/Strategy', color: '#f59e0b', border: '#d97706', rgb: '245, 158, 11' }
+    };
+
+    // Concepts Network Data
+    const conceptNodes = [
+      {
+        id: 'project',
+        label: 'Project\n(ProjectTemplate)',
+        category: 'project',
+        description: 'The core context in Rayuela. Organizes tasks, configures game strategies, boundaries, and calendar rules. Subscribed by users to participate in campaigns.',
+        codePath: 'rayuela-NodeBackend/src/module/project/persistence/project.schema.ts',
+        attributes: [
+          { key: 'name', type: 'String', val: 'Unique name of the citizen science project' },
+          { key: 'description', type: 'String', val: 'Information explaining the project target' },
+          { key: 'taskTypes', type: 'TaskTypeValue[]', val: 'Defined methods of data collection (e.g. photo, audio)' },
+          { key: 'areas', type: 'GeoJSON', val: 'Spatial regions representing where contributions are requested' },
+          { key: 'timeIntervals', type: 'TimeInterval[]', val: 'Allowed days/time slots for project activity' },
+          { key: 'gamificationStrategy', type: 'String', val: 'e.g. "BASIC" or "ELASTIC_REWARD" (Points/Badges algorithm)' },
+          { key: 'leaderboardStrategy', type: 'String', val: 'e.g. "POINTS_FIRST" or "BADGES_FIRST" (Sorting leaderboard)' }
+        ]
+      },
+      {
+        id: 'user',
+        label: 'User\n(User)',
+        category: 'user',
+        description: 'Represents a volunteer or researcher participating in the platform. Voluntarily performs check-ins to solve tasks and earn points/badges.',
+        codePath: 'rayuela-NodeBackend/src/module/auth/users/user.entity.ts',
+        attributes: [
+          { key: 'completeName', type: 'String', val: 'User\'s full name' },
+          { key: 'username', type: 'String', val: 'Unique login username' },
+          { key: 'email', type: 'String', val: 'Verified contact email' },
+          { key: 'role', type: 'UserRole', val: 'Volunteer or Admin permissions' },
+          { key: 'gameProfiles', type: 'GameProfile[]', val: 'List of participation profiles per project' }
+        ]
+      },
+      {
+        id: 'gameprofile',
+        label: 'Game Profile\n(GameProfile)',
+        category: 'user',
+        description: 'Holds a user\'s progress and achievements scoped to a single Project. Stores earned badge strings and total score points.',
+        codePath: 'rayuela-NodeBackend/src/module/auth/users/user.entity.ts',
+        attributes: [
+          { key: 'projectId', type: 'String', val: 'Reference to the project' },
+          { key: 'points', type: 'Number', val: 'Accumulated score points in this project context' },
+          { key: 'badges', type: 'String[]', val: 'Names of badges awarded to the user by the gamification engine' },
+          { key: 'active', type: 'Boolean', val: 'Whether the user is currently subscribed to the project' }
+        ]
+      },
+      {
+        id: 'gamification_config',
+        label: 'Gamification Config\n(GamificationTemplate)',
+        category: 'engine',
+        description: 'Houses the complete rules list (Badges rules and Point rules) for a specific Project. Dictates how engines process contributions.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'projectId', type: 'String', val: 'Ref to the parent Project' },
+          { key: 'badges', type: 'BadgeTemplate[]', val: 'Set of badge definitions configured for the project' },
+          { key: 'pointRules', type: 'PointRuleSchema[]', val: 'Point multipliers based on task types, areas, and times' }
+        ]
+      },
+      {
+        id: 'badge_rule',
+        label: 'Badge Rule\n(BadgeTemplate)',
+        category: 'badge',
+        description: 'Defines the triggers and dependency constraints that a user must satisfy to earn a particular Badge. Linked to the project\'s gamification config.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'name', type: 'String', val: 'Unique badge name' },
+          { key: 'description', type: 'String', val: 'Display instructions for users' },
+          { key: 'imageUrl', type: 'String', val: 'Visual icon reference stored in Garage S3' },
+          { key: 'checkinsAmount', type: 'Number', val: 'Required amount of successful check-ins to unlock badge' },
+          { key: 'mustContribute', type: 'Boolean', val: 'If true, check-in must resolve an active Task (not just location check)' },
+          { key: 'previousBadges', type: 'String[]', val: 'List of parent badge names that must be unlocked first (DAG dependency)' },
+          { key: 'taskType', type: 'String', val: 'Filters trigger: e.g. "photo", "audio", or "Cualquiera" (any)' },
+          { key: 'areaId', type: 'String', val: 'Filters trigger: specific Area ID or "Cualquiera" (any)' },
+          { key: 'timeIntervalId', type: 'String', val: 'Filters trigger: specific TimeInterval ID or "Cualquiera" (any)' }
+        ]
+      },
+      {
+        id: 'point_rule',
+        label: 'Point Rule\n(PointRule)',
+        category: 'engine',
+        description: 'A rule defining how many points are awarded to a user for doing checkins under certain conditions (specific tasks, times, or areas).',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'score', type: 'Number', val: 'Points awarded per matching checkin' },
+          { key: 'taskType', type: 'String', val: 'Filter task type requirement' },
+          { key: 'areaId', type: 'String', val: 'Filter area requirement' },
+          { key: 'timeIntervalId', type: 'String', val: 'Filter schedule requirement' },
+          { key: 'mustContribute', type: 'Boolean', val: 'Whether checkin must solve a task' }
+        ]
+      },
+      {
+        id: 'checkin',
+        label: 'Check-in\n(CheckInTemplate)',
+        category: 'checkin',
+        description: 'The physical upload or entry submitted by a User. Captures spatial coordinates, time, file attachments, and metadata, sent to the gamification engine to check rules.',
+        codePath: 'rayuela-NodeBackend/src/module/checkin/persistence/checkin.schema.ts',
+        attributes: [
+          { key: 'userId', type: 'String', val: 'User who performed this checkin' },
+          { key: 'projectId', type: 'String', val: 'Scope of the checkin contribution' },
+          { key: 'latitude / longitude', type: 'String', val: 'Location of the upload' },
+          { key: 'datetime', type: 'Date', val: 'Timestamp of the upload' },
+          { key: 'taskType', type: 'String', val: 'Type of checkin (e.g. photo, audio, text)' },
+          { key: 'contributesTo', type: 'String', val: 'Optional Task ID that this checkin solves/contributes to' },
+          { key: 'imageRefs', type: 'String[]', val: 'Array of S3 storage file URLs uploaded' }
+        ]
+      },
+      {
+        id: 'task',
+        label: 'Task\n(TaskSchemaTemplate)',
+        category: 'task',
+        description: 'A specific work unit within a project located in a geographical Area and restricted to a Time Interval. Solved when a user submits a valid matching contribution.',
+        codePath: 'rayuela-NodeBackend/src/module/task/persistence/task.schema.ts',
+        attributes: [
+          { key: 'name', type: 'String', val: 'Task identifier/title' },
+          { key: 'type', type: 'String', val: 'Task category (audio, photo, text, etc.)' },
+          { key: 'areaId', type: 'ObjectId', val: 'Spatio-boundary validation constraint' },
+          { key: 'timeIntervalId', type: 'ObjectId', val: 'Temporal constraint validation' },
+          { key: 'solved', type: 'Boolean', val: 'Whether this task has been completed and closed' }
+        ]
+      },
+      {
+        id: 'area',
+        label: 'Area\n(Area)',
+        category: 'spatiotemporal',
+        description: 'A spatial constraint defined in the project as a GeoJSON polygon. Restricts where tasks can exist and where checkins must occur to satisfy badges/points.',
+        codePath: 'rayuela-NodeBackend/src/module/project/persistence/project.schema.ts',
+        attributes: [
+          { key: 'id', type: 'String', val: 'Area identifier referenced in rules' },
+          { key: 'geometry', type: 'Polygon', val: 'GeoJSON shape containing coordinate arrays' }
+        ]
+      },
+      {
+        id: 'time_interval',
+        label: 'Time Interval\n(TimeInterval)',
+        category: 'spatiotemporal',
+        description: 'A temporal constraint defining specific dates, active days of the week, and hours of the day. Restricts tasks and check-in validity.',
+        codePath: 'rayuela-NodeBackend/src/module/project/persistence/project.schema.ts',
+        attributes: [
+          { key: 'name', type: 'String', val: 'Schedule name referenced in rules' },
+          { key: 'days', type: 'Number[]', val: 'Days of week (1 to 7) when active' },
+          { key: 'time', type: '{start, end}', val: 'Allowed time range (e.g. "09:00" to "18:00")' },
+          { key: 'startDate / endDate', type: 'String', val: 'Allowed calendar date range' }
+        ]
+      },
+      {
+        id: 'badge_engine',
+        label: 'Basic Badge Engine\n(BasicBadgeEngine)',
+        category: 'engine',
+        description: 'Pluggable strategy engine that evaluates user checkins against project Badge Rules. Awards badges when conditions (previous badges, task type, area, time, contribution) align.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/entities/engine/gamification/basic-badge-engine.ts',
+        attributes: [
+          { key: 'assignableTo', type: 'Method', val: 'Checks if project is configured for BASIC gamification' },
+          { key: 'newBadgesFor', type: 'Method', val: 'Main logic filtering and matching Badge Rules on new check-in' }
+        ]
+      },
+      {
+        id: 'points_engine',
+        label: 'Basic Points Engine\n(PointsEngine)',
+        category: 'engine',
+        description: 'Pluggable strategy engine that awards score points to users when they perform checkins matching active Point Rules.',
+        codePath: 'rayuela-NodeBackend/src/module/checkin/entities/game.entity.ts',
+        attributes: [
+          { key: 'reward', type: 'Method', val: 'Calculates the sum of points unlocked by a checkin matching project Point Rules' }
+        ]
+      },
+      {
+        id: 'leaderboard_engine',
+        label: 'Leaderboard Engine\n(LeaderboardEngine)',
+        category: 'engine',
+        description: 'Strategy engine sorting players on the Leaderboard. Can prioritize point totals first ("POINTS_FIRST") or badge count first ("BADGES_FIRST").',
+        codePath: 'rayuela-NodeBackend/src/module/checkin/entities/game.entity.ts',
+        attributes: [
+          { key: 'build', type: 'Method', val: 'Returns a sorted list of users (LeaderboardUser[]) representing current standings' }
+        ]
+      }
+    ];
+
+    const conceptEdges = [
+      { from: 'user', to: 'gameprofile', label: 'has', title: 'A User contains multiple Game Profiles' },
+      { from: 'gameprofile', to: 'project', label: 'belongs to', title: 'Game Profile tracks progress for a specific Project' },
+      { from: 'gameprofile', to: 'badge_rule', label: 'stores earned', title: 'Earned badges are stored by name in Game Profile' },
+      
+      { from: 'user', to: 'checkin', label: 'performs', title: 'User uploads/creates Checkins' },
+      { from: 'checkin', to: 'project', label: 'submits to', title: 'Checkin is bound to a single Project' },
+      { from: 'checkin', to: 'task', label: 'resolves', title: 'Checkin contributesTo a specific Task' },
+      { from: 'checkin', to: 'badge_engine', label: 'evaluated by', title: 'Checkin triggers BadgeEngine evaluation' },
+      { from: 'checkin', to: 'points_engine', label: 'evaluated by', title: 'Checkin triggers PointsEngine evaluation' },
+      
+      { from: 'project', to: 'gamification_config', label: 'configures', title: 'Project holds one Gamification Configuration' },
+      { from: 'project', to: 'task', label: 'has', title: 'Tasks belong to a specific Project' },
+      { from: 'project', to: 'area', label: 'defines', title: 'Project defines geo-fenced boundaries (Areas)' },
+      { from: 'project', to: 'time_interval', label: 'defines', title: 'Project defines active schedules (TimeIntervals)' },
+      
+      { from: 'gamification_config', to: 'badge_rule', label: 'defines', title: 'Gamification template contains many Badge Rules' },
+      { from: 'gamification_config', to: 'point_rule', label: 'defines', title: 'Gamification template contains many Point Rules' },
+      
+      { from: 'badge_rule', to: 'badge_rule', label: 'requires (DAG)', title: 'Badge Rules can list previous badges as prerequisites (Prerequisite DAG)' },
+      { from: 'badge_rule', to: 'area', label: 'filtered by', title: 'Badge Rule can require checkin within specific Area' },
+      { from: 'badge_rule', to: 'time_interval', label: 'filtered by', title: 'Badge Rule can require checkin within specific TimeInterval' },
+      { from: 'badge_rule', to: 'badge_engine', label: 'used by', title: 'Badge Rules are filtered by BasicBadgeEngine' },
+      
+      { from: 'point_rule', to: 'area', label: 'filtered by', title: 'Point Rule can apply to specific Area' },
+      { from: 'point_rule', to: 'time_interval', label: 'filtered by', title: 'Point Rule can apply to specific TimeInterval' },
+      { from: 'point_rule', to: 'points_engine', label: 'used by', title: 'Point Rules are processed by PointsEngine' },
+ 
+      { from: 'task', to: 'area', label: 'bound to', title: 'Task is restricted to a geographical Area boundary' },
+      { from: 'task', to: 'time_interval', label: 'bound to', title: 'Task is active during a specific TimeInterval' },
+      
+      { from: 'badge_engine', to: 'gameprofile', label: 'awards badge to', title: 'BasicBadgeEngine appends badge name to Game Profile when matched' },
+      { from: 'points_engine', to: 'gameprofile', label: 'awards points to', title: 'PointsEngine increments score in Game Profile when matched' },
+      { from: 'leaderboard_engine', to: 'gameprofile', label: 'sorts', title: 'LeaderboardEngine reads Game Profiles to build user standings' }
+    ];
+
+    // Badge Prerequisite DAG Data (Illustrative flow based on Rayuela's i18n and gamification structure)
+    const badgeDagNodes = [
+      {
+        id: 'b_welcome',
+        label: 'Welcome Badge\n(Novice)',
+        category: 'badge',
+        description: 'Awarded immediately upon subscribing to the project or completing the first basic check-in.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'checkinsAmount', type: 'Number', val: '1' },
+          { key: 'mustContribute', type: 'Boolean', val: 'false' },
+          { key: 'taskType', type: 'String', val: 'Cualquiera (Any)' }
+        ]
+      },
+      {
+        id: 'b_photographer',
+        label: 'Photo Collector\n(Visual Contributor)',
+        category: 'badge',
+        description: 'Earned by contributing multiple photographic tasks. Requires the user to have the Welcome Badge first.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'checkinsAmount', type: 'Number', val: '5' },
+          { key: 'mustContribute', type: 'Boolean', val: 'true' },
+          { key: 'taskType', type: 'String', val: 'photo' },
+          { key: 'previousBadges', type: 'String[]', val: '["Welcome Badge"]' }
+        ]
+      },
+      {
+        id: 'b_reporter',
+        label: 'Audio Reporter\n(Aural Contributor)',
+        category: 'badge',
+        description: 'Earned by contributing multiple sound recording tasks. Requires the user to have the Welcome Badge first.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'checkinsAmount', type: 'Number', val: '5' },
+          { key: 'mustContribute', type: 'Boolean', val: 'true' },
+          { key: 'taskType', type: 'String', val: 'audio' },
+          { key: 'previousBadges', type: 'String[]', val: '["Welcome Badge"]' }
+        ]
+      },
+      {
+        id: 'b_park_inspector',
+        label: 'Green Guardian\n(Area Specific)',
+        category: 'badge',
+        description: 'Awarded for contributions inside a specific nature park or conservation area. Requires Photo Collector badge.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'checkinsAmount', type: 'Number', val: '3' },
+          { key: 'mustContribute', type: 'Boolean', val: 'true' },
+          { key: 'areaId', type: 'String', val: 'green_zone_01' },
+          { key: 'previousBadges', type: 'String[]', val: '["Photo Collector"]' }
+        ]
+      },
+      {
+        id: 'b_night_owl',
+        label: 'Night Owl\n(Time Specific)',
+        category: 'badge',
+        description: 'Awarded for contributions made during late evening time slots. Requires the Welcome Badge.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'checkinsAmount', type: 'Number', val: '3' },
+          { key: 'timeIntervalId', type: 'String', val: 'late_night_slot' },
+          { key: 'previousBadges', type: 'String[]', val: '["Welcome Badge"]' }
+        ]
+      },
+      {
+        id: 'b_master',
+        label: 'Elite Ecologist\n(Top Tier Badge)',
+        category: 'badge',
+        description: 'The highest honor in the project. Requires completing photo, audio, time-sensitive, and spatial badges.',
+        codePath: 'rayuela-NodeBackend/src/module/gamification/persistence/gamification.schema.ts',
+        attributes: [
+          { key: 'checkinsAmount', type: 'Number', val: '25' },
+          { key: 'mustContribute', type: 'Boolean', val: 'true' },
+          { key: 'previousBadges', type: 'String[]', val: '["Photo Collector", "Audio Reporter", "Green Guardian", "Night Owl"]' }
+        ]
+      }
+    ];
+
+    const badgeDagEdges = [
+      { from: 'b_welcome', to: 'b_photographer', label: 'unlocks path for' },
+      { from: 'b_welcome', to: 'b_reporter', label: 'unlocks path for' },
+      { from: 'b_welcome', to: 'b_night_owl', label: 'unlocks path for' },
+      { from: 'b_photographer', to: 'b_park_inspector', label: 'unlocks path for' },
+      { from: 'b_photographer', to: 'b_master', label: 'requires' },
+      { from: 'b_reporter', to: 'b_master', label: 'requires' },
+      { from: 'b_park_inspector', to: 'b_master', label: 'requires' },
+      { from: 'b_night_owl', to: 'b_master', label: 'requires' }
+    ];
+
+    // --- State Variables ---
+    let activeView = 'concepts'; // 'concepts' or 'badges'
+    let network = null;
+    let nodesDataset = new vis.DataSet([]);
+    let edgesDataset = new vis.DataSet([]);
+    let filteredCategories = new Set(Object.keys(CATEGORIES));
+    let selectedNodeId = null;
+
+    // --- DOM Load Initialization ---
+    document.addEventListener("DOMContentLoaded", () => {
+      buildFiltersList();
+      buildLegend();
+      renderNetwork();
+      
+      // Select first node by default on load
+      setTimeout(() => {
+        selectNode(activeView === 'concepts' ? 'badge_rule' : 'b_master');
+      }, 500);
+    });
+
+    // --- Render Filters ---
+    function buildFiltersList() {
+      const container = document.getElementById('filtersList');
+      container.innerHTML = '';
+
+      Object.entries(CATEGORIES).forEach(([key, value]) => {
+        // Count how many nodes fit this category
+        const count = activeView === 'concepts' 
+          ? conceptNodes.filter(n => n.category === key).length 
+          : badgeDagNodes.filter(n => n.category === key).length;
+
+        if (count === 0 && activeView === 'badges') return; // Skip empty categories in DAG view
+
+        const item = document.createElement('div');
+        item.className = 'filter-item';
+        item.onclick = () => toggleFilter(key);
+        item.innerHTML = `
+          <div class="filter-label-group">
+            <div class="filter-dot" style="background-color: ${value.color}; border: 1px solid ${value.border}"></div>
+            <span>${value.label}</span>
+          </div>
+          <div class="filter-label-group">
+            <span class="filter-count">${count}</span>
+            <input type="checkbox" id="chk-${key}" ${filteredCategories.has(key) ? 'checked' : ''} style="accent-color: var(--color-user); pointer-events: none;">
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function buildLegend() {
+      const overlay = document.getElementById('legendOverlay');
+      overlay.innerHTML = '';
+      
+      Object.entries(CATEGORIES).forEach(([key, value]) => {
+        if (!filteredCategories.has(key)) return;
+        const count = activeView === 'concepts' 
+          ? conceptNodes.filter(n => n.category === key).length 
+          : badgeDagNodes.filter(n => n.category === key).length;
+        if (count === 0) return;
+
+        const legendItem = document.createElement('div');
+        legendItem.className = 'legend-item';
+        legendItem.innerHTML = `
+          <div class="legend-color" style="background-color: ${value.color}; border: 1px solid ${value.border}"></div>
+          <span>${value.label}</span>
+        `;
+        overlay.appendChild(legendItem);
+      });
+    }
+
+    // --- Toggle Categories ---
+    function toggleFilter(category) {
+      if (filteredCategories.has(category)) {
+        filteredCategories.delete(category);
+      } else {
+        filteredCategories.add(category);
+      }
+      document.getElementById(`chk-${category}`).checked = filteredCategories.has(category);
+      applyFilter();
+      buildLegend();
+    }
+
+    function toggleAllFilters(enable) {
+      if (enable) {
+        filteredCategories = new Set(Object.keys(CATEGORIES));
+      } else {
+        filteredCategories.clear();
+      }
+      
+      Object.keys(CATEGORIES).forEach(category => {
+        const checkbox = document.getElementById(`chk-${category}`);
+        if (checkbox) checkbox.checked = enable;
+      });
+      
+      applyFilter();
+      buildLegend();
+    }
+
+    function applyFilter() {
+      const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+      const currentNodes = activeView === 'concepts' ? conceptNodes : badgeDagNodes;
+      const currentEdges = activeView === 'concepts' ? conceptEdges : badgeDagEdges;
+
+      // Filter Nodes
+      const visibleNodes = currentNodes.filter(node => {
+        const matchesCategory = filteredCategories.has(node.category);
+        const matchesSearch = !searchVal || 
+          node.label.toLowerCase().includes(searchVal) ||
+          node.description.toLowerCase().includes(searchVal) ||
+          (node.attributes && node.attributes.some(attr => attr.key.toLowerCase().includes(searchVal) || attr.val.toLowerCase().includes(searchVal)));
+        
+        return matchesCategory && matchesSearch;
+      });
+
+      const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
+
+      // Filter Edges: only display if both source and target are visible
+      const visibleEdges = currentEdges.filter(edge => {
+        return visibleNodeIds.has(edge.from) && visibleNodeIds.has(edge.to);
+      });
+
+      // Prepare vis objects
+      const nodesData = visibleNodes.map(node => {
+        const catConfig = CATEGORIES[node.category];
+        const isSelected = node.id === selectedNodeId;
+        
+        return {
+          id: node.id,
+          label: node.label,
+          color: {
+            background: '#0b111e', // Slate 950
+            border: catConfig.color, // Neon border
+            highlight: {
+              background: '#1e293b',
+              border: '#ffffff'
+            },
+            hover: {
+              background: '#151f32',
+              border: catConfig.color
+            }
+          },
+          borderWidth: isSelected ? 4 : 2.5,
+          shadow: isSelected ? { enabled: true, color: 'rgba(255,255,255,0.4)', size: 12, x: 0, y: 0 } : { enabled: true, color: 'rgba(0,0,0,0.5)', size: 6, x: 2, y: 2 },
+          shape: node.category === 'badge' ? 'diamond' : (node.category === 'engine' ? 'hexagon' : 'box'),
+          font: {
+            color: '#f3f4f6',
+            face: 'Outfit',
+            size: 15,
+            bold: { color: '#ffffff', size: 16, face: 'Outfit' }
+          },
+          margin: 16,
+          widthConstraint: { minimum: 160, maximum: 240 },
+          shapeProperties: {
+            borderRadius: 10
+          }
+        };
+      });
+
+      nodesDataset.clear();
+      nodesDataset.add(nodesData);
+
+      edgesDataset.clear();
+      edgesDataset.add(visibleEdges.map(edge => ({
+        ...edge,
+        arrows: {
+          to: { enabled: true, scaleFactor: 1.2 }
+        },
+        font: { 
+          face: 'Outfit', 
+          size: 13, 
+          color: '#e5e7eb', 
+          strokeWidth: 4, 
+          strokeColor: '#0b0f19', // Halo background matches page bg
+          align: 'middle' 
+        },
+        color: { 
+          color: 'rgba(255,255,255,0.22)', 
+          highlight: '#00e5ff', 
+          hover: 'rgba(255,255,255,0.4)' 
+        },
+        width: 2.5,
+        hoverWidth: 3.5,
+        selectionWidth: 4,
+        smooth: { type: 'cubicBezier', roundness: 0.4 }
+      })));
+    }
+
+    // --- Search Input Change ---
+    function onSearchChange() {
+      applyFilter();
+    }
+
+    // --- Switch View (Concepts vs Badge DAG) ---
+    function switchView(view) {
+      if (activeView === view) return;
+      activeView = view;
+      
+      // Update toggle buttons active class
+      document.getElementById('btnConcepts').className = view === 'concepts' ? 'active' : '';
+      document.getElementById('btnBadges').className = view === 'badges' ? 'active' : '';
+      
+      // Reset search filter
+      document.getElementById('searchInput').value = '';
+      toggleAllFilters(true);
+      
+      selectedNodeId = null;
+      closeDetails();
+      
+      buildFiltersList();
+      buildLegend();
+      renderNetwork();
+    }
+
+    // --- Zoom and Fit Controls ---
+    function zoom(scale) {
+      network.zoom({ scale: network.getScale() * scale });
+    }
+
+    function resetView() {
+      network.fit({
+        animation: {
+          duration: 1000,
+          easingFunction: 'easeInOutQuad'
+        }
+      });
+    }
+
+    // --- Network Rendering Core ---
+    function renderNetwork() {
+      const container = document.getElementById('network-canvas');
+      applyFilter(); // populate datasets
+
+      const data = {
+        nodes: nodesDataset,
+        edges: edgesDataset
+      };
+
+      // Configuration for views
+      let options = {
+        physics: {
+          enabled: true,
+          solver: 'forceAtlas2Based',
+          forceAtlas2Based: {
+            gravitationalConstant: -180, // Much stronger repulsion to push nodes apart
+            centralGravity: 0.01,
+            springLength: 260, // Much longer springs for spacing out nodes
+            springConstant: 0.05,
+            damping: 0.8,
+            avoidOverlap: 1 // Crucial to prevent nodes overlapping
+          },
+          stabilization: {
+            iterations: 200,
+            updateInterval: 25
+          }
+        },
+        interaction: {
+          hover: true,
+          tooltipDelay: 100,
+          selectConnectedEdges: false
+        }
+      };
+
+      if (activeView === 'badges') {
+        // Render Hierarchical Tree Layout for Badge DAG Prerequisite Map
+        options = {
+          layout: {
+            hierarchical: {
+              direction: 'UD', // Up-Down
+              sortMethod: 'directed',
+              nodeSpacing: 240, // Increased node spacing
+              levelSeparation: 180 // Increased level separation
+            }
+          },
+          physics: {
+            enabled: false
+          },
+          interaction: {
+            hover: true,
+            tooltipDelay: 100,
+            selectConnectedEdges: false
+          }
+        };
+      }
+
+      network = new vis.Network(container, data, options);
+
+      // Event Listeners
+      network.on("click", (params) => {
+        if (params.nodes.length > 0) {
+          selectNode(params.nodes[0]);
+        } else {
+          selectedNodeId = null;
+          closeDetails();
+          applyFilter(); // Reset selection border width
+        }
+      });
+
+      network.on("hoverNode", (params) => {
+        document.body.style.cursor = 'pointer';
+      });
+
+      network.on("blurNode", (params) => {
+        document.body.style.cursor = 'default';
+      });
+    }
+
+    // --- Select Node Actions ---
+    function selectNode(nodeId) {
+      selectedNodeId = nodeId;
+      applyFilter(); // Redraw with highlighted border width
+      
+      const currentNodes = activeView === 'concepts' ? conceptNodes : badgeDagNodes;
+      const nodeData = currentNodes.find(n => n.id === nodeId);
+      
+      if (!nodeData) return;
+
+      // Populate Panel info
+      document.getElementById('panelCategory').innerText = CATEGORIES[nodeData.category].label;
+      document.getElementById('panelCategory').style.backgroundColor = `rgba(${CATEGORIES[nodeData.category].rgb}, 0.15)`;
+      document.getElementById('panelCategory').style.color = CATEGORIES[nodeData.category].color;
+      document.getElementById('panelCategory').style.border = `1px solid ${CATEGORIES[nodeData.category].border}`;
+      
+      document.getElementById('panelName').innerText = nodeData.label.replace('\n', ' ');
+      document.getElementById('panelDescription').innerText = nodeData.description;
+      
+      // Attributes Table
+      const attrsContainer = document.getElementById('panelAttributes');
+      const attrsSection = document.getElementById('attributesSection');
+      if (nodeData.attributes && nodeData.attributes.length > 0) {
+        attrsSection.style.display = 'block';
+        attrsContainer.innerHTML = '';
+        nodeData.attributes.forEach(attr => {
+          const row = document.createElement('div');
+          row.className = 'attribute-row';
+          row.innerHTML = `
+            <div>
+              <span class="attr-key">${attr.key}</span>
+              <span class="attr-type">: ${attr.type}</span>
+            </div>
+            <div class="attr-val">${attr.val}</div>
+          `;
+          attrsContainer.appendChild(row);
+        });
+      } else {
+        attrsSection.style.display = 'none';
+      }
+
+      // Source File Reference
+      document.getElementById('panelCodePath').innerText = nodeData.codePath.split('/').pop();
+      document.getElementById('panelCodePath').title = nodeData.codePath;
+      document.getElementById('panelCodeLink').href = 'file:///' + nodeData.codePath;
+
+      // Relationships calculation
+      const relationsContainer = document.getElementById('panelRelationships');
+      relationsContainer.innerHTML = '';
+      
+      const currentEdges = activeView === 'concepts' ? conceptEdges : badgeDagEdges;
+      
+      // Incoming edges
+      const incoming = currentEdges.filter(e => e.to === nodeId);
+      incoming.forEach(edge => {
+        const fromNode = currentNodes.find(n => n.id === edge.from);
+        if (fromNode) {
+          const item = document.createElement('div');
+          item.className = 'relation-item';
+          item.innerHTML = `
+            <span class="relation-target" onclick="selectNode('${fromNode.id}')">${fromNode.label.replace('\n', ' ')}</span>
+            <span class="relation-verb">${edge.label}</span>
+            <span class="relation-arrow"><i class="fa-solid fa-arrow-right"></i></span>
+            <span style="font-weight: 500;">This Node</span>
+          `;
+          relationsContainer.appendChild(item);
+        }
+      });
+
+      // Outgoing edges
+      const outgoing = currentEdges.filter(e => e.from === nodeId);
+      outgoing.forEach(edge => {
+        const toNode = currentNodes.find(n => n.id === edge.to);
+        if (toNode) {
+          const item = document.createElement('div');
+          item.className = 'relation-item';
+          item.innerHTML = `
+            <span style="font-weight: 500;">This Node</span>
+            <span class="relation-arrow"><i class="fa-solid fa-arrow-right"></i></span>
+            <span class="relation-verb">${edge.label}</span>
+            <span class="relation-target" onclick="selectNode('${toNode.id}')">${toNode.label.replace('\n', ' ')}</span>
+          `;
+          relationsContainer.appendChild(item);
+        }
+      });
+
+      if (incoming.length === 0 && outgoing.length === 0) {
+        relationsContainer.innerHTML = '<span class="desc-text" style="font-style: italic; color: var(--text-muted);">None</span>';
+      }
+
+      // Open Sidebar Panel
+      document.getElementById('detailsPanel').classList.add('open');
+      
+      // Shift camera focus to selected node with offset
+      network.focus(nodeId, {
+        scale: 1.1,
+        offset: { x: -80, y: 0 },
+        animation: {
+          duration: 800,
+          easingFunction: 'easeInOutQuad'
+        }
+      });
+    }
+
+    function closeDetails() {
+      document.getElementById('detailsPanel').classList.remove('open');
+    }
+  </script>
+</body>
+</html>

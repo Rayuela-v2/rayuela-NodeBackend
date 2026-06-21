@@ -1,6 +1,8 @@
 - [Home](README.md)
 - [Deployment & Infrastructure](deployment.md)
 - [Analytics Data Extraction](analytics-queries.md)
+- [Gamification & Badges Architecture](gamification-badges.md)
+
 
 - **Mobile Application**
   - [Architecture Overview](mobile/README.md)
