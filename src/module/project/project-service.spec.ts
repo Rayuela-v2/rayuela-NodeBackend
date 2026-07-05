@@ -9,6 +9,14 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
 import { BadgeRule } from '../gamification/entities/gamification.entity';
+import { getModelToken } from '@nestjs/mongoose';
+import { CheckInTemplate } from '../checkin/persistence/checkin.schema';
+
+const mockCheckInModel = {
+  find: jest.fn().mockReturnThis(),
+  sort: jest.fn().mockReturnThis(),
+  exec: jest.fn().mockResolvedValue([]),
+};
 
 const mockProjectDao = {
   create: jest.fn(),
@@ -36,6 +44,10 @@ describe('ProjectService', () => {
         { provide: ProjectDao, useValue: mockProjectDao },
         { provide: UserService, useValue: mockUserService },
         { provide: LeaderboardService, useValue: mockLeaderboardService },
+        {
+          provide: getModelToken(CheckInTemplate.collectionName()),
+          useValue: mockCheckInModel,
+        },
       ],
     }).compile();
 

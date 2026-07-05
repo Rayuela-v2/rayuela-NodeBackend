@@ -94,6 +94,20 @@ export class GamificationDao {
       .exec();
   }
 
+  async updateBadgeStatus(
+    projectId: string,
+    badgeId: string,
+    status: string,
+  ): Promise<GamificationTemplate | null> {
+    return this.gamificationModel
+      .findOneAndUpdate(
+        { projectId, 'badges._id': badgeId },
+        { $set: { 'badges.$.status': status } },
+        { new: true },
+      )
+      .exec();
+  }
+
   async addScoreRule(
     projectId: string,
     pointRule: CreateScoreRuleDto,
@@ -154,6 +168,7 @@ export class GamificationDao {
             b.taskType,
             b.areaId,
             b.timeIntervalId,
+            b.status || 'active',
           ),
       ),
       saved.pointRules.map(

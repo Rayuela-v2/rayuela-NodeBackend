@@ -30,6 +30,10 @@ export class GamificationService {
     return this.gamificationDao.deleteBadge(projectId, id);
   }
 
+  updateBadgeStatus(projectId: string, id: string, status: string) {
+    return this.gamificationDao.updateBadgeStatus(projectId, id, status);
+  }
+
   updateBadge(id: string, updateBadgeDTO: UpdateBadgeRuleDTO) {
     return this.gamificationDao.updateBadge(id, updateBadgeDTO);
   }

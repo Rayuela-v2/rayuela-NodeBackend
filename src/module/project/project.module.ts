@@ -8,11 +8,17 @@ import { AuthModule } from '../auth/auth.module';
 import { GamificationModule } from '../gamification/gamification.module';
 import { LeaderboardModule } from '../leaderboard/leaderboard.module';
 
+import {
+  CheckInSchema,
+  CheckInTemplate,
+} from '../checkin/persistence/checkin.schema';
+
 @Module({
   imports: [
     LeaderboardModule,
     MongooseModule.forFeature([
       { name: ProjectTemplate.collectionName(), schema: ProjectSchema },
+      { name: CheckInTemplate.collectionName(), schema: CheckInSchema },
     ]),
     AuthModule,
     GamificationModule,

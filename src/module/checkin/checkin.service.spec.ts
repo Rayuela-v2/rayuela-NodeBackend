@@ -25,6 +25,7 @@ const mockCheckInDao = {
   remove: jest.fn(),
   findByProjectId: jest.fn(),
   findForAdmin: jest.fn(),
+  findAllByProjectIdAndUser: jest.fn().mockResolvedValue([]),
 };
 
 const mockIdempotencyDao = {

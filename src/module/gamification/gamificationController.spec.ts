@@ -10,6 +10,7 @@ describe('GamificationController', () => {
     createBadge: jest.fn(),
     updateBadge: jest.fn(),
     removeBadge: jest.fn(),
+    updateBadgeStatus: jest.fn(),
     createScoreRule: jest.fn(),
     updateScoreRule: jest.fn(),
     removeScoreRule: jest.fn(),
@@ -49,6 +50,15 @@ describe('GamificationController', () => {
     it('should remove badge', async () => {
       await controller.remove('p1', 'b1');
       expect(service.removeBadge).toHaveBeenCalledWith('p1', 'b1');
+    });
+
+    it('should update badge status', async () => {
+      await controller.updateBadgeStatus('p1', 'b1', 'active');
+      expect(service.updateBadgeStatus).toHaveBeenCalledWith(
+        'p1',
+        'b1',
+        'active',
+      );
     });
   });
 

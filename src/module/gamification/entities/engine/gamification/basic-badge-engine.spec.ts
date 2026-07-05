@@ -55,6 +55,102 @@ describe('BasicBadgeEngine', () => {
       const result = engine.newBadgesFor(user, checkin, project);
       expect(result).toContain(rule);
     });
+
+    it('should bypass faded prerequisite badges and award active child badge', () => {
+      const ruleA = new BadgeRule(
+        'rA',
+        'p1',
+        'BadgeA',
+        'desc',
+        'img',
+        1,
+        false,
+        [],
+        'Cualquiera',
+        'A1',
+        'Cualquiera',
+        'faded',
+      );
+      const ruleB = new BadgeRule(
+        'rB',
+        'p1',
+        'BadgeB',
+        'desc',
+        'img',
+        1,
+        false,
+        ['BadgeA'],
+        'Cualquiera',
+        'A2',
+        'Cualquiera',
+        'active',
+      );
+
+      const featureA1 = {
+        properties: { id: 'A1' },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [0, 0],
+              [1, 0],
+              [1, 1],
+              [0, 1],
+              [0, 0],
+            ],
+          ],
+        },
+      };
+      const featureA2 = {
+        properties: { id: 'A2' },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [2, 2],
+              [3, 2],
+              [3, 3],
+              [2, 3],
+              [2, 2],
+            ],
+          ],
+        },
+      };
+
+      const project = {
+        id: 'p1',
+        gamification: { badgesRules: [ruleA, ruleB] },
+        taskTypes: ['type1'],
+        timeIntervals: [],
+        areas: { features: [featureA1, featureA2] },
+      } as any;
+
+      const user = new User('t@t.com', 'u', 'p', 'T');
+      user.id = 'u1';
+      user.addProject('p1');
+      const checkin1 = {
+        date: new Date(),
+        taskType: 'type1',
+        longitude: '0.5',
+        latitude: '0.5',
+        contributesTo: '',
+        projectId: 'p1',
+      } as any;
+      user.checkins = [checkin1];
+
+      const checkin2 = {
+        date: new Date(),
+        taskType: 'type1',
+        longitude: '2.5',
+        latitude: '2.5',
+        contributesTo: '',
+        projectId: 'p1',
+      } as any;
+
+      const result = engine.newBadgesFor(user, checkin2, project);
+      expect(result).toContain(ruleB);
+      expect(result).not.toContain(ruleA);
+    });
   });
 
   describe('internal matches', () => {
@@ -176,15 +272,180 @@ describe('BasicBadgeEngine', () => {
       const checkin = { longitude: '0.5', latitude: '0.5' } as any;
       expect((engine as any).matchArea(rule2, checkin, project)).toBe(true);
     });
-    it('should check if user has previous badges', () => {
-      const rule = { previousBadges: ['B1'] } as any;
-      const user = { hasBadgeWithName: jest.fn() } as any;
+    it('should check if user has previous badges satisfied recursively', () => {
+      const b1 = new BadgeRule(
+        'r1',
+        'p1',
+        'B1',
+        'd',
+        'i',
+        1,
+        false,
+        [],
+        'Cualquiera',
+        'Cualquiera',
+        'Cualquiera',
+        'faded',
+      );
+      const b2 = new BadgeRule(
+        'r2',
+        'p1',
+        'B2',
+        'd',
+        'i',
+        1,
+        false,
+        ['B1'],
+        'Cualquiera',
+        'Cualquiera',
+        'Cualquiera',
+      );
+      const proj = {
+        gamification: { badgesRules: [b1, b2] },
+      } as any;
 
-      user.hasBadgeWithName.mockReturnValue(true);
-      expect((engine as any).userHasPreviousBadges(rule, user)).toBe(true);
+      const checkinsEmpty: any[] = [];
+      const checkinOk = {
+        date: new Date(),
+        taskType: 'type1',
+        longitude: '0',
+        latitude: '0',
+      } as any;
 
-      user.hasBadgeWithName.mockReturnValue(false);
-      expect((engine as any).userHasPreviousBadges(rule, user)).toBe(false);
+      expect(
+        engine.isBadgeSatisfied(b2, checkinsEmpty, proj, [], new Map()),
+      ).toBe(false);
+      expect(
+        engine.isBadgeSatisfied(
+          b2,
+          [checkinOk, checkinOk],
+          proj,
+          [],
+          new Map(),
+        ),
+      ).toBe(true);
+    });
+
+    it('should evaluate 3-layer faded badge chain (A -> B -> C) as satisfied recursively with check-ins', () => {
+      const a = new BadgeRule(
+        'rA',
+        'p1',
+        'A',
+        'd',
+        'i',
+        1,
+        false,
+        [],
+        'Cualquiera',
+        'Cualquiera',
+        'Cualquiera',
+        'faded',
+      );
+      const b = new BadgeRule(
+        'rB',
+        'p1',
+        'B',
+        'd',
+        'i',
+        1,
+        false,
+        ['A'],
+        'Cualquiera',
+        'Cualquiera',
+        'Cualquiera',
+        'faded',
+      );
+      const c = new BadgeRule(
+        'rC',
+        'p1',
+        'C',
+        'd',
+        'i',
+        1,
+        false,
+        ['B'],
+        'Cualquiera',
+        'Cualquiera',
+        'Cualquiera',
+        'active',
+      );
+      const proj = {
+        gamification: { badgesRules: [a, b, c] },
+      } as any;
+
+      const ch = {
+        date: new Date(),
+        taskType: 'type1',
+        longitude: '0',
+        latitude: '0',
+      } as any;
+
+      // 0 check-ins should NOT satisfy C
+      expect(engine.isBadgeSatisfied(c, [], proj, [], new Map())).toBe(false);
+
+      // 1 check-in should satisfy C recursively
+      expect(engine.isBadgeSatisfied(c, [ch], proj, [], new Map())).toBe(true);
+    });
+
+    it('should evaluate branching faded prerequisites correctly (B, C -> A) recursively', () => {
+      const b = new BadgeRule(
+        'rB',
+        'p1',
+        'B',
+        'd',
+        'i',
+        1,
+        false,
+        [],
+        'Cualquiera',
+        'Cualquiera',
+        'Cualquiera',
+        'faded',
+      );
+      const c = new BadgeRule(
+        'rC',
+        'p1',
+        'C',
+        'd',
+        'i',
+        1,
+        false,
+        [],
+        'Cualquiera',
+        'Cualquiera',
+        'Cualquiera',
+        'faded',
+      );
+      const a = new BadgeRule(
+        'rA',
+        'p1',
+        'A',
+        'd',
+        'i',
+        1,
+        false,
+        ['B', 'C'],
+        'Cualquiera',
+        'Cualquiera',
+        'Cualquiera',
+        'active',
+      );
+      const proj = {
+        gamification: { badgesRules: [b, c, a] },
+      } as any;
+
+      const ch = {
+        date: new Date(),
+        taskType: 'type1',
+        longitude: '0',
+        latitude: '0',
+      } as any;
+
+      // 0 check-ins should NOT satisfy A
+      expect(engine.isBadgeSatisfied(a, [], proj, [], new Map())).toBe(false);
+
+      // 1 check-in should satisfy A recursively
+      expect(engine.isBadgeSatisfied(a, [ch], proj, [], new Map())).toBe(true);
     });
   });
 });

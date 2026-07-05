@@ -35,6 +35,13 @@ export class BadgeTemplate {
 
   @Prop({ required: true })
   timeIntervalId: string;
+
+  @Prop({
+    required: true,
+    default: 'active',
+    enum: ['active', 'faded', 'expired'],
+  })
+  status?: string;
 }
 
 const BadgeTemplateSchema = SchemaFactory.createForClass(BadgeTemplate);

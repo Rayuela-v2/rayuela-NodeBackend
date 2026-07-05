@@ -29,6 +29,7 @@ export class BadgeRule {
     taskType: string,
     areaId: string,
     timeIntervalId: string,
+    status = 'active',
   ) {
     this._id = id;
     this.projectId = projectId;
@@ -41,6 +42,7 @@ export class BadgeRule {
     this.taskType = taskType;
     this.areaId = areaId;
     this.timeIntervalId = timeIntervalId;
+    this.status = status;
   }
 
   _id: string;
@@ -54,6 +56,7 @@ export class BadgeRule {
   taskType: string;
   areaId: string;
   timeIntervalId: string;
+  status: string;
 }
 
 export class PointRule {

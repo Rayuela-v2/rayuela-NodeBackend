@@ -333,6 +333,12 @@ export class CheckinService {
       createCheckinDto.projectId,
     );
     const user = await this.userService.getByUserId(createCheckinDto.userId);
+
+    user.checkins = await this.checkInDao.findAllByProjectIdAndUser(
+      createCheckinDto.userId,
+      createCheckinDto.projectId,
+    );
+
     const users = await this.userService.findAllByProjectId(
       createCheckinDto.projectId,
     );
