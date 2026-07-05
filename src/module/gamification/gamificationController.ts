@@ -6,7 +6,9 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { GamificationService } from './gamification.service';
 import { CreateBadgeRuleDTO } from './dto/create-badge-rule-d-t.o';
 import { UpdateGamificationDto } from './dto/update-gamification.dto';
@@ -34,6 +36,16 @@ export class GamificationController {
   @Delete('/:projectId/badge/:id')
   remove(@Param('projectId') projectId: string, @Param('id') id: string) {
     return this.gamificationService.removeBadge(projectId, id);
+  }
+
+  @Patch('/:projectId/badge/:id/status/:status')
+  @UseGuards(AuthGuard('jwt'))
+  updateBadgeStatus(
+    @Param('projectId') projectId: string,
+    @Param('id') id: string,
+    @Param('status') status: string,
+  ) {
+    return this.gamificationService.updateBadgeStatus(projectId, id, status);
   }
 
   @Post('score-rule')

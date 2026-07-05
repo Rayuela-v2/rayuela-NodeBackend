@@ -8,29 +8,98 @@ import { TimeInterval } from '../../../../task/entities/time-restriction.entity'
 import { GeoUtils } from '../../../../task/utils/geoUtils';
 import { GamificationStrategy } from '../../../../project/dto/create-project.dto';
 import { getTaskTypeName } from '../../../../project/entities/task-type';
-
 export class BasicBadgeEngine implements BadgeEngine {
   assignableTo(project: Project): boolean {
     return project.gamificationStrategy === GamificationStrategy.BASIC;
   }
 
   newBadgesFor(u: User, ch: Checkin, project: Project): BadgeRule[] {
-    return project.gamification.badgesRules.filter(
-      (r) =>
-        this.ruleMatch(r, ch, project, u) &&
-        !u
-          .getGameProfileFromProject(project.id)
-          .badges.find((b) => b === r.name),
+    const memo = new Map<string, boolean>();
+    const allCheckins = [...(u.checkins || []), ch];
+    const currentBadges = u.getGameProfileFromProject(project.id)?.badges || [];
+
+    const satisfiedBadges = project.gamification.badgesRules.filter((badge) =>
+      this.isBadgeSatisfied(badge, allCheckins, project, currentBadges, memo),
+    );
+
+    const earnableBadges = satisfiedBadges.filter(
+      (badge) => badge.status === 'active',
+    );
+
+    return earnableBadges.filter(
+      (badge) => !currentBadges.includes(badge.name),
     );
   }
 
-  private ruleMatch(r: BadgeRule, checkin: Checkin, project: Project, u: User) {
+  /**
+   * Recursively evaluates if a badge is satisfied based on check-in history.
+   * A badge is satisfied if:
+   * 1. All previous prerequisite badges are recursively satisfied.
+   * 2. The user has enough check-ins satisfying the criteria for this badge specifically.
+   */
+  isBadgeSatisfied(
+    badge: BadgeRule,
+    checkins: Checkin[],
+    project: Project,
+    currentBadges: string[],
+    memo: Map<string, boolean>,
+  ): boolean {
+    if (memo.has(badge.name)) {
+      return memo.get(badge.name)!;
+    }
+
+    // 1. Evaluate prerequisite badges recursively (DAG evaluation)
+    let prereqsSatisfied = true;
+    for (const prereqName of badge.previousBadges || []) {
+      const prereqRule = project.gamification.badgesRules.find(
+        (rule) => rule.name === prereqName,
+      );
+      if (!prereqRule) {
+        prereqsSatisfied = false;
+        break;
+      }
+
+      const isPrereqSatisfied = this.isBadgeSatisfied(
+        prereqRule,
+        checkins,
+        project,
+        currentBadges,
+        memo,
+      );
+
+      if (!isPrereqSatisfied) {
+        prereqsSatisfied = false;
+        break;
+      }
+    }
+
+    if (!prereqsSatisfied) {
+      memo.set(badge.name, false);
+      return false;
+    }
+
+    // 2. Validate current badge's own check-in requirements
+    const matchingCheckins = checkins.filter((ch) =>
+      this.matchesBadgeCriteria(badge, ch, project),
+    );
+    const selfSatisfied =
+      matchingCheckins.length >= (badge.checkinsAmount || 1);
+
+    const isSatisfied = selfSatisfied;
+    memo.set(badge.name, isSatisfied);
+    return isSatisfied;
+  }
+
+  matchesBadgeCriteria(
+    badge: BadgeRule,
+    ch: Checkin,
+    project: Project,
+  ): boolean {
     return (
-      this.userHasPreviousBadges(r, u) &&
-      this.matchTaskType(r, checkin, project) &&
-      this.matchTimeInterval(r, checkin, project) &&
-      this.matchArea(r, checkin, project) &&
-      this.verifyContributes(r, checkin)
+      this.matchTaskType(badge, ch, project) &&
+      this.matchTimeInterval(badge, ch, project) &&
+      this.matchArea(badge, ch, project) &&
+      this.verifyContributes(badge, ch)
     );
   }
 
@@ -83,10 +152,6 @@ export class BasicBadgeEngine implements BadgeEngine {
         polygon.geometry,
       )
     );
-  }
-
-  private userHasPreviousBadges(r: BadgeRule, u: User) {
-    return r.previousBadges.every((b) => u.hasBadgeWithName(b));
   }
 
   private verifyContributes(r: BadgeRule, checkin: Checkin) {

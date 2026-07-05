@@ -9,6 +9,14 @@ import { getTaskTypeName } from './entities/task-type';
 import { BadgeRule } from '../gamification/entities/gamification.entity';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
 import { Leaderboard } from '../leaderboard/persistence/leaderboard-user-schema';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import {
+  CheckInTemplate,
+  CheckInDocument,
+} from '../checkin/persistence/checkin.schema';
+import { CheckinMapper } from '../checkin/persistence/CheckinMapper';
+import { BasicBadgeEngine } from '../gamification/entities/engine/gamification/basic-badge-engine';
 
 export interface UserStatus {
   isSubscribed: boolean;
@@ -23,6 +31,8 @@ export class ProjectService {
     private readonly projectDao: ProjectDao,
     private readonly userService: UserService,
     private readonly leaderboardService: LeaderboardService,
+    @InjectModel(CheckInTemplate.collectionName())
+    private readonly checkInModel: Model<CheckInDocument>,
   ) {}
 
   async findAll(): Promise<(ProjectTemplate & { _id: string })[]> {
@@ -37,6 +47,15 @@ export class ProjectService {
     if (userId) {
       const user = await this.userService.getByUserId(userId);
       const gp = user.getGameProfileFromProject(project.id);
+
+      const checkinDocs = await this.checkInModel
+        .find({ projectId: project.id, userId })
+        .sort({ datetime: 1 })
+        .exec();
+      const checkins = checkinDocs.map((c) => CheckinMapper.toEntity(c, null));
+      const badgeEngine = new BasicBadgeEngine();
+      const memo = new Map<string, boolean>();
+
       return {
         ...project,
         user: gp && {
@@ -44,6 +63,13 @@ export class ProjectService {
           badges: project.gamification.badgesRules.map((b) => ({
             ...b,
             active: gp.badges.includes(b.name),
+            satisfied: badgeEngine.isBadgeSatisfied(
+              b,
+              checkins,
+              project,
+              gp.badges || [],
+              memo,
+            ),
           })),
           points: gp?.points,
           leaderboard: await this.leaderboardService.getLeaderboardFor(

@@ -107,6 +107,17 @@ export class CheckInDao {
       .exec();
   }
 
+  async findAllByProjectIdAndUser(
+    userId: string,
+    projectId: string,
+  ): Promise<Checkin[]> {
+    const list = await this.checkInModel
+      .find({ projectId, userId })
+      .sort({ datetime: 1 })
+      .exec();
+    return list.map((c) => CheckinMapper.toEntity(c, null));
+  }
+
   /**
    * Admin endpoint backbone: builds a Mongo filter from `AdminCheckinFilter`,
    * paginates, and returns total count for the UI to render page controls.
