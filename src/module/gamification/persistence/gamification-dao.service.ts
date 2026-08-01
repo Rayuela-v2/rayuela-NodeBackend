@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -31,22 +36,33 @@ export class GamificationDao {
     projectId: string,
     createBadgeDto: CreateBadgeRuleDTO,
   ): Promise<GamificationTemplate | null> {
-    const gamificationTemplate = await this.gamificationModel.findOne({
+    let gamificationTemplate = await this.gamificationModel.findOne({
       projectId,
     });
     if (!gamificationTemplate) {
-      throw new Error('Project not found');
+      gamificationTemplate = await this.createNewGamificationFor(projectId);
+    }
+    if (!gamificationTemplate || !gamificationTemplate.badges) {
+      throw new NotFoundException('Project not found');
     }
     if (
       gamificationTemplate.badges.find((b) => b.name === createBadgeDto.name)
     ) {
-      throw new Error('Ya existe una insignia con ese nombre');
+      throw new ConflictException('Ya existe una insignia con ese nombre');
     }
     gamificationTemplate.badges.push({
       _id: new Types.ObjectId(),
       ...createBadgeDto,
+      checkinsAmount: Math.max(1, createBadgeDto.checkinsAmount || 1),
     });
-    return gamificationTemplate.save();
+    try {
+      return await gamificationTemplate.save();
+    } catch (err: any) {
+      if (err.name === 'ValidationError') {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
   }
 
   async getBadgesByProject(
@@ -112,17 +128,27 @@ export class GamificationDao {
     projectId: string,
     pointRule: CreateScoreRuleDto,
   ): Promise<GamificationTemplate | null> {
-    const gamificationTemplate = await this.gamificationModel.findOne({
+    let gamificationTemplate = await this.gamificationModel.findOne({
       projectId,
     });
     if (!gamificationTemplate) {
-      throw new Error('Project not found');
+      gamificationTemplate = await this.createNewGamificationFor(projectId);
+    }
+    if (!gamificationTemplate || !gamificationTemplate.pointRules) {
+      throw new NotFoundException('Project not found');
     }
     gamificationTemplate.pointRules.push({
       _id: new Types.ObjectId(),
       ...pointRule,
     });
-    return gamificationTemplate.save();
+    try {
+      return await gamificationTemplate.save();
+    } catch (err: any) {
+      if (err.name === 'ValidationError') {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
   }
 
   async updatePointRule(
@@ -151,10 +177,13 @@ export class GamificationDao {
   }
 
   async getGamificationByProjectId(projectId: string): Promise<Gamification> {
-    const saved = await this.gamificationModel.findOne({ projectId }).exec();
+    let saved = await this.gamificationModel.findOne({ projectId }).exec();
+    if (!saved) {
+      saved = await this.createNewGamificationFor(projectId);
+    }
     return new Gamification(
       projectId,
-      saved.badges.map(
+      (saved?.badges || []).map(
         (b) =>
           new BadgeRule(
             b._id,
@@ -171,7 +200,7 @@ export class GamificationDao {
             b.status || 'active',
           ),
       ),
-      saved.pointRules.map(
+      (saved?.pointRules || []).map(
         (r) =>
           new PointRule(
             r._id,
@@ -187,16 +216,47 @@ export class GamificationDao {
   }
 
   async updateBadge(id: string, updateBadgeDTO: UpdateBadgeRuleDTO) {
-    const gamificationTemplate = await this.gamificationModel.findOne({
+    let gamificationTemplate = await this.gamificationModel.findOne({
       projectId: updateBadgeDTO.projectId,
     });
     if (!gamificationTemplate) {
-      throw new Error('Project not found');
+      gamificationTemplate = await this.createNewGamificationFor(
+        updateBadgeDTO.projectId,
+      );
     }
-    gamificationTemplate.badges = gamificationTemplate.badges
-      .filter((b) => b._id !== id)
-      .concat([updateBadgeDTO as BadgeTemplate]);
-    return gamificationTemplate.save();
+    if (!gamificationTemplate || !gamificationTemplate.badges) {
+      throw new NotFoundException('Project not found');
+    }
+    const existingIndex = gamificationTemplate.badges.findIndex(
+      (b) => String(b._id) === String(id),
+    );
+
+    if (existingIndex === -1) {
+      throw new NotFoundException('Insignia no encontrada');
+    }
+
+    const duplicate = gamificationTemplate.badges.find(
+      (b, idx) => idx !== existingIndex && b.name === updateBadgeDTO.name,
+    );
+    if (duplicate) {
+      throw new ConflictException('Ya existe una insignia con ese nombre');
+    }
+
+    gamificationTemplate.badges[existingIndex] = {
+      ...gamificationTemplate.badges[existingIndex],
+      ...updateBadgeDTO,
+      checkinsAmount: Math.max(1, updateBadgeDTO.checkinsAmount || 1),
+      _id: gamificationTemplate.badges[existingIndex]._id,
+    } as BadgeTemplate;
+
+    try {
+      return await gamificationTemplate.save();
+    } catch (err: any) {
+      if (err.name === 'ValidationError') {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
   }
 
   async createNewGamificationFor(projectId: string) {
@@ -214,3 +274,5 @@ export class GamificationDao {
     );
   }
 }
+
+
