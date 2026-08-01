@@ -20,6 +20,7 @@ export class UserMapper {
       userDocument.createdAt,
       userDocument.refreshTokenHash ?? null,
       userDocument.refreshTokenExpiry ?? null,
+      userDocument.description ?? '',
     );
   }
 
@@ -31,6 +32,7 @@ export class UserMapper {
       email: user.email,
       password: user.password,
       profile_image: user.profileImage,
+      description: user.description ?? '',
       verified: user.verified,
       role: user.role,
       resetToken: user.resetToken,

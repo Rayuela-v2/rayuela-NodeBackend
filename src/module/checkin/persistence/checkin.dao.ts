@@ -99,6 +99,47 @@ export class CheckInDao {
     }
   }
 
+  /**
+   * Per-user check-in totals for the profile screen, in one round trip.
+   *
+   * `days` are UTC calendar days (`$dateToString` on `datetime`) — enough to
+   * compute an activity streak. ponytail: UTC, not the volunteer's local
+   * timezone; if a streak flipping at the wrong hour ever bothers anyone,
+   * pass a tz offset into `$dateToString`.
+   */
+  async statsByUser(
+    userId: string,
+  ): Promise<{ byProject: { projectId: string; count: number }[]; days: string[] }> {
+    const [result] = await this.checkInModel
+      .aggregate([
+        { $match: { userId } },
+        {
+          $facet: {
+            byProject: [
+              { $group: { _id: '$projectId', count: { $sum: 1 } } },
+              { $project: { _id: 0, projectId: '$_id', count: 1 } },
+            ],
+            days: [
+              {
+                $group: {
+                  _id: {
+                    $dateToString: { format: '%Y-%m-%d', date: '$datetime' },
+                  },
+                },
+              },
+              { $sort: { _id: -1 } },
+            ],
+          },
+        },
+      ])
+      .exec();
+
+    return {
+      byProject: result?.byProject ?? [],
+      days: (result?.days ?? []).map((d: { _id: string }) => d._id),
+    };
+  }
+
   findByProjectId(userId: string, projectId: string) {
     return this.checkInModel
       .find({ projectId, userId })

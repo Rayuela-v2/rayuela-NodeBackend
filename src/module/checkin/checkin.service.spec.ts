@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CheckinService } from './checkin.service';
+import { CheckinService, currentStreak } from './checkin.service';
 import { CheckInDao } from './persistence/checkin.dao';
 import { TaskService } from '../task/task.service';
 import { UserService } from '../auth/users/user.service';
@@ -26,6 +26,7 @@ const mockCheckInDao = {
   findByProjectId: jest.fn(),
   findForAdmin: jest.fn(),
   findAllByProjectIdAndUser: jest.fn().mockResolvedValue([]),
+  statsByUser: jest.fn(),
 };
 
 const mockIdempotencyDao = {
@@ -588,5 +589,75 @@ describe('CheckinService', () => {
         checkinId: 'fresh-checkin',
       });
     });
+  });
+
+  describe('statsForUser', () => {
+    it('suma totales y arma la racha desde los días del DAO', async () => {
+      mockCheckInDao.statsByUser.mockResolvedValue({
+        byProject: [
+          { projectId: 'p1', count: 4 },
+          { projectId: 'p2', count: 3 },
+        ],
+        days: ['2026-07-31', '2026-07-30', '2026-07-28'],
+      });
+      jest.useFakeTimers().setSystemTime(new Date('2026-07-31T10:00:00Z'));
+
+      const stats = await service.statsForUser('user1');
+
+      expect(stats.total).toBe(7);
+      expect(stats.activeDays).toBe(3);
+      expect(stats.streakDays).toBe(2);
+      expect(stats.lastCheckinDay).toBe('2026-07-31');
+      jest.useRealTimers();
+    });
+
+    it('devuelve ceros cuando el usuario no tiene check-ins', async () => {
+      mockCheckInDao.statsByUser.mockResolvedValue({ byProject: [], days: [] });
+      const stats = await service.statsForUser('user1');
+      expect(stats).toEqual({
+        total: 0,
+        byProject: [],
+        activeDays: 0,
+        streakDays: 0,
+        lastCheckinDay: null,
+      });
+    });
+  });
+});
+
+describe('currentStreak', () => {
+  const today = new Date('2026-07-31T23:00:00Z');
+
+  it('cuenta días consecutivos terminando hoy', () => {
+    expect(
+      currentStreak(['2026-07-31', '2026-07-30', '2026-07-29'], today),
+    ).toBe(3);
+  });
+
+  it('ayer todavía cuenta — la racha no se rompe hasta perder un día entero', () => {
+    expect(currentStreak(['2026-07-30', '2026-07-29'], today)).toBe(2);
+  });
+
+  it('se corta si el último check-in tiene más de un día', () => {
+    expect(currentStreak(['2026-07-29', '2026-07-28'], today)).toBe(0);
+  });
+
+  it('para en el primer hueco', () => {
+    expect(
+      currentStreak(['2026-07-31', '2026-07-29', '2026-07-28'], today),
+    ).toBe(1);
+  });
+
+  it('cruza el límite de mes', () => {
+    expect(
+      currentStreak(
+        ['2026-08-01', '2026-07-31'],
+        new Date('2026-08-01T05:00:00Z'),
+      ),
+    ).toBe(2);
+  });
+
+  it('sin días, sin racha', () => {
+    expect(currentStreak([], today)).toBe(0);
   });
 });

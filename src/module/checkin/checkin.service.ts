@@ -220,6 +220,21 @@ export class CheckinService {
   }
 
   /**
+   * Aggregated activity for the profile screen: how many missions, where,
+   * on how many distinct days, and the current streak.
+   */
+  async statsForUser(userId: string): Promise<UserCheckinStats> {
+    const { byProject, days } = await this.checkInDao.statsByUser(userId);
+    return {
+      total: byProject.reduce((sum, p) => sum + p.count, 0),
+      byProject,
+      activeDays: days.length,
+      streakDays: currentStreak(days),
+      lastCheckinDay: days[0] ?? null,
+    };
+  }
+
+  /**
    * Admin endpoint: list every checkin for the project with optional filters
    * and pagination. The "task name" filter is resolved here because tasks
    * live in their own collection — we look them up first and pass the
@@ -385,4 +400,38 @@ function parseDate(value: string | undefined): Date | undefined {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+export interface UserCheckinStats {
+  total: number;
+  byProject: { projectId: string; count: number }[];
+  activeDays: number;
+  streakDays: number;
+  /** `YYYY-MM-DD` of the most recent check-in, or null when there are none. */
+  lastCheckinDay: string | null;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Consecutive active days ending today or yesterday. Yesterday still counts,
+ * so a streak doesn't read as broken just because the volunteer hasn't been
+ * out yet today. Expects distinct `YYYY-MM-DD` days sorted descending.
+ */
+export function currentStreak(daysDesc: string[], today = new Date()): number {
+  if (daysDesc.length === 0) return 0;
+  const asUtc = (day: string) => Date.parse(`${day}T00:00:00Z`);
+  const todayUtc = Date.UTC(
+    today.getUTCFullYear(),
+    today.getUTCMonth(),
+    today.getUTCDate(),
+  );
+  if ((todayUtc - asUtc(daysDesc[0])) / DAY_MS > 1) return 0;
+
+  let streak = 1;
+  for (let i = 1; i < daysDesc.length; i++) {
+    if ((asUtc(daysDesc[i - 1]) - asUtc(daysDesc[i])) / DAY_MS !== 1) break;
+    streak++;
+  }
+  return streak;
 }

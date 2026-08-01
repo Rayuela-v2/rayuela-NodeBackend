@@ -94,6 +94,7 @@ export class User {
   private _createdAt: Date;
   private _refreshTokenHash: string | null;
   private _refreshTokenExpiry: Date | null;
+  private _description: string;
 
   constructor(
     completeName: string,
@@ -112,6 +113,7 @@ export class User {
     createdAt: Date = new Date(),
     refreshTokenHash: string | null = null,
     refreshTokenExpiry: Date | null = null,
+    description: string = '',
   ) {
     this._completeName = completeName;
     this._username = username;
@@ -129,6 +131,15 @@ export class User {
     this._createdAt = createdAt;
     this._refreshTokenHash = refreshTokenHash;
     this._refreshTokenExpiry = refreshTokenExpiry;
+    this._description = description ?? '';
+  }
+
+  get description(): string {
+    return this._description;
+  }
+
+  set description(value: string) {
+    this._description = value ?? '';
   }
 
   get password(): string {

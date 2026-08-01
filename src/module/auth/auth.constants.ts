@@ -10,12 +10,18 @@
 export const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1 hour
 
 /**
- * How long a refresh token stays valid, in days.
- *
- * Instagram-style infinite-session: ~60–90 days. If a user doesn't open the
- * app for this long, they'll be forced to log in again.
+ * How long a refresh token stays valid, in days — counted from its LAST use,
+ * not from login. Every `/auth/refresh` slides the expiry forward, so a user
+ * who opens the app at least once every 90 days never gets logged out.
  */
 export const REFRESH_TOKEN_TTL_DAYS = 90;
+
+/**
+ * Refresh tokens are per-session, not per-user: each login pushes one entry
+ * onto `user.refreshTokens`, so signing in on a second device (or on the web)
+ * doesn't kill the first one. Oldest entries fall off past this cap.
+ */
+export const MAX_REFRESH_SESSIONS = 10;
 
 /**
  * Refresh tokens are shaped as `${userId}${SEPARATOR}${secret}` so the server

@@ -101,6 +101,17 @@ export class CheckinController {
   }
 
   /**
+   * Aggregated activity of the signed-in volunteer, for the profile screen.
+   * Mounted under `me/...` so it can't collide with `GET /checkin/:id`, and
+   * declared before it so Nest matches this route first.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('me/stats')
+  async myStats(@Req() req) {
+    return this.checkinService.statsForUser(req.user.userId);
+  }
+
+  /**
    * Admin-only listing of every checkin for `projectId`. Supports filters
    * (taskName, taskType, hasPhotos, location radius, userId, dateRange,
    * contributed) plus pagination via `page` and `limit`.

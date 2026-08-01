@@ -1,0 +1,2856 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Directed Graph Drawing & Cost Emulation Tool</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Tailwind CSS & FontAwesome Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <style>
+      body {
+        font-family: "Plus Jakarta Sans", sans-serif;
+        background-color: #09090b;
+        color: #fafafa;
+        overflow-hidden: true;
+      }
+      h1,
+      h2,
+      h3,
+      h4,
+      .font-outfit {
+        font-family: "Outfit", sans-serif;
+      }
+
+      /* Neon / Glow custom utilities */
+      .glow-emerald {
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+        border-color: #10b981;
+      }
+      .glow-indigo {
+        box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        border-color: #6366f1;
+      }
+      .glow-amber {
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+        border-color: #f59e0b;
+      }
+      .glow-rose {
+        box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+        border-color: #f43f5e;
+      }
+
+      /* Dotted SVG Grid Pattern */
+      .canvas-grid {
+        background-image: radial-gradient(
+          rgba(255, 255, 255, 0.08) 1px,
+          transparent 1px
+        );
+        background-size: 20px 20px;
+      }
+
+      /* Hide scrollbars but keep functionality */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  </head>
+  <body class="h-screen w-screen flex flex-col overflow-hidden">
+    <!-- Header / Top Bar -->
+    <header
+      class="bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex items-center justify-between z-10"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20"
+        >
+          <i class="fa-solid fa-diagram-project text-white text-lg"></i>
+        </div>
+        <div>
+          <h1
+            class="text-xl font-bold tracking-tight text-white flex items-center gap-2"
+          >
+            Rayuela PathFinder
+            <span
+              class="text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full font-normal"
+              >v1.0</span
+            >
+          </h1>
+          <p class="text-xs text-zinc-400">
+            Directed Graph Design & Dijkstra Emulation Tool
+          </p>
+        </div>
+      </div>
+
+      <!-- Presets and Global Actions -->
+      <div class="flex items-center gap-3">
+        <!-- Preset Selector -->
+        <div
+          class="flex items-center gap-2 bg-zinc-950 border border-zinc-800 rounded-lg p-1"
+        >
+          <span class="text-xs text-zinc-500 px-2 font-medium">Presets:</span>
+          <button
+            onclick="loadPreset('linear')"
+            class="px-2.5 py-1 text-xs font-semibold rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
+          >
+            Linear
+          </button>
+          <button
+            onclick="loadPreset('binary')"
+            class="px-2.5 py-1 text-xs font-semibold rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
+          >
+            Tree
+          </button>
+          <button
+            onclick="loadPreset('diamond')"
+            class="px-2.5 py-1 text-xs font-semibold rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
+          >
+            Diamond
+          </button>
+          <button
+            onclick="loadPreset('grid')"
+            class="px-2.5 py-1 text-xs font-semibold rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
+          >
+            Grid
+          </button>
+          <button
+            onclick="loadPreset('dijkstra')"
+            class="px-2.5 py-1 text-xs font-semibold rounded-md text-zinc-300 hover:text-white hover:bg-zinc-800 transition"
+          >
+            Classic
+          </button>
+          <button
+            onclick="loadPreset('badges')"
+            class="px-2.5 py-1 text-xs font-semibold rounded-md text-emerald-400 border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition"
+          >
+            Badges
+          </button>
+        </div>
+
+        <!-- Import/Export & Actions -->
+        <div class="flex gap-2">
+          <button
+            onclick="exportGraphJSON()"
+            class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-sm font-medium flex items-center gap-2 border border-zinc-700 transition"
+          >
+            <i class="fa-solid fa-download"></i> Export JSON
+          </button>
+          <label
+            class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-sm font-medium flex items-center gap-2 border border-zinc-700 transition cursor-pointer"
+          >
+            <i class="fa-solid fa-upload"></i> Import JSON
+            <input
+              type="file"
+              id="importFile"
+              accept=".json"
+              class="hidden"
+              onchange="importGraphJSON(event)"
+            />
+          </label>
+          <button
+            onclick="clearGraph()"
+            class="px-3 py-1.5 bg-red-950/40 hover:bg-red-900/40 text-red-400 rounded-lg text-sm font-medium flex items-center gap-2 border border-red-900/30 transition"
+          >
+            <i class="fa-solid fa-trash-can"></i> Clear
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <div class="flex-1 flex overflow-hidden">
+      <!-- Left Sidebar: Controls & Inspector -->
+      <aside
+        class="w-80 bg-zinc-900/50 backdrop-blur-md border-r border-zinc-800 flex flex-col overflow-y-auto no-scrollbar"
+      >
+        <!-- Tool Modes -->
+        <div class="p-4 border-b border-zinc-800">
+          <h3
+            class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2"
+          >
+            Editor Mode
+          </h3>
+          <div
+            class="grid grid-cols-3 gap-1 bg-zinc-950 p-1 border border-zinc-800 rounded-lg"
+          >
+            <button
+              id="mode-pointer"
+              onclick="setMode('pointer')"
+              class="py-2 text-sm rounded-md flex flex-col items-center gap-1 font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 transition"
+            >
+              <i class="fa-solid fa-mouse-pointer"></i>
+              <span class="text-[10px]">Select</span>
+            </button>
+            <button
+              id="mode-edge"
+              onclick="setMode('edge')"
+              class="py-2 text-sm rounded-md flex flex-col items-center gap-1 font-semibold text-zinc-400 hover:text-white transition"
+            >
+              <i class="fa-solid fa-arrow-right"></i>
+              <span class="text-[10px]">Add Edge</span>
+            </button>
+            <button
+              id="mode-eraser"
+              onclick="setMode('eraser')"
+              class="py-2 text-sm rounded-md flex flex-col items-center gap-1 font-semibold text-zinc-400 hover:text-white transition"
+            >
+              <i class="fa-solid fa-eraser"></i>
+              <span class="text-[10px]">Eraser</span>
+            </button>
+          </div>
+          <p class="text-[10px] text-zinc-500 mt-2 text-center">
+            <i class="fa-solid fa-info-circle mr-1"></i> Double-click canvas to
+            create a node in Select mode
+          </p>
+        </div>
+
+        <!-- Canvas View Options -->
+        <div class="p-4 border-b border-zinc-800">
+          <h3
+            class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2"
+          >
+            Canvas Config
+          </h3>
+          <div class="space-y-3">
+            <label class="flex items-center justify-between cursor-pointer">
+              <span class="text-xs text-zinc-300">Snap to Grid (20px)</span>
+              <input
+                type="checkbox"
+                id="snap-grid-checkbox"
+                checked
+                class="accent-indigo-500"
+              />
+            </label>
+            <label class="flex items-center justify-between cursor-pointer">
+              <span class="text-xs text-zinc-300"
+                >Show Unreachable Costs (∞)</span
+              >
+              <input
+                type="checkbox"
+                id="show-infinity-checkbox"
+                checked
+                class="accent-indigo-500"
+                onchange="updatePathsAndCosts()"
+              />
+            </label>
+          </div>
+        </div>
+
+        <!-- Property Inspector (Contextual) -->
+        <div class="p-4 flex-1 flex flex-col">
+          <h3
+            class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3"
+          >
+            Properties Inspector
+          </h3>
+
+          <div
+            id="inspector-empty"
+            class="flex-1 flex flex-col items-center justify-center text-center text-zinc-500 p-4 border border-dashed border-zinc-800 rounded-xl"
+          >
+            <i class="fa-solid fa-circle-info text-2xl mb-2"></i>
+            <p class="text-xs">Click a Node or Edge to edit its properties</p>
+          </div>
+
+          <!-- Node Inspector -->
+          <div id="inspector-node" class="space-y-4 hidden">
+            <div
+              class="flex justify-between items-center bg-zinc-950 p-3 rounded-lg border border-zinc-800"
+            >
+              <span class="text-xs font-bold text-zinc-400">Selected Node</span>
+              <span
+                id="node-badge-id"
+                class="text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 px-2 py-0.5 border border-indigo-500/30 rounded"
+                >Node A</span
+              >
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-xs text-zinc-400">Node Name / Label</label>
+              <input
+                type="text"
+                id="node-name-input"
+                oninput="editNodeLabel()"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div class="space-y-2">
+              <label class="text-xs text-zinc-400 block">Node Settings</label>
+              <button
+                id="node-start-btn"
+                onclick="setNodeAsStart()"
+                class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center gap-2"
+              >
+                <i class="fa-solid fa-play"></i> Set as Start Node
+              </button>
+            </div>
+
+            <div
+              id="node-cost-container"
+              class="p-3 bg-zinc-950 rounded-lg border border-zinc-800 space-y-1"
+            >
+              <span class="text-xs text-zinc-500 block"
+                >Shortest Path Cost:</span
+              >
+              <span
+                id="node-inspector-cost"
+                class="text-lg font-bold text-white font-mono"
+                >0</span
+              >
+            </div>
+
+            <!-- Badge Specific Settings (only visible in Badge Mode) -->
+            <div
+              id="badge-node-settings"
+              class="space-y-3 p-3 bg-zinc-950 rounded-lg border border-zinc-800 hidden"
+            >
+              <span class="text-xs font-bold text-emerald-400 block mb-1"
+                >Gamification Badge Config</span
+              >
+
+              <div class="space-y-1">
+                <label class="text-[10px] text-zinc-500">Badge Status</label>
+                <select
+                  id="node-status-select"
+                  onchange="editNodeStatus()"
+                  class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-white focus:outline-none"
+                >
+                  <option value="active">Active (Grantable)</option>
+                  <option value="faded">Faded (Deprecated/Locked)</option>
+                </select>
+              </div>
+
+              <div class="space-y-1">
+                <label class="text-[10px] text-zinc-500"
+                  >Target Check-in Area</label
+                >
+                <select
+                  id="node-area-select"
+                  onchange="editNodeArea()"
+                  class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-white focus:outline-none"
+                >
+                  <option value="Cualquiera">Cualquiera (Any)</option>
+                  <option value="Zone A">Zone A</option>
+                  <option value="Zone B">Zone B</option>
+                  <option value="Zone C">Zone C</option>
+                  <option value="Zone D">Zone D</option>
+                </select>
+              </div>
+
+              <div class="space-y-1">
+                <label class="text-[10px] text-zinc-500 flex justify-between">
+                  <span>Req. Check-ins</span>
+                  <span
+                    id="node-req-checkins-display"
+                    class="font-bold text-emerald-400"
+                    >1</span
+                  >
+                </label>
+                <input
+                  type="number"
+                  id="node-req-checkins-input"
+                  min="0"
+                  max="99"
+                  oninput="editNodeReqCheckins(this.value)"
+                  class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-white focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Edge Inspector -->
+          <div id="inspector-edge" class="space-y-4 hidden">
+            <div
+              class="flex justify-between items-center bg-zinc-950 p-3 rounded-lg border border-zinc-800"
+            >
+              <span class="text-xs font-bold text-zinc-400">Selected Edge</span>
+              <span
+                id="edge-badge-name"
+                class="text-[10px] font-mono font-bold bg-violet-500/20 text-violet-300 px-2 py-0.5 border border-violet-500/30 rounded"
+                >A → B</span
+              >
+            </div>
+
+            <div id="edge-weight-container" class="space-y-1">
+              <label class="text-xs text-zinc-400 flex justify-between">
+                <span>Effort / Cost Weight</span>
+                <span id="edge-weight-display" class="font-bold text-indigo-400"
+                  >1</span
+                >
+              </label>
+              <input
+                type="range"
+                id="edge-weight-slider"
+                min="1"
+                max="99"
+                step="1"
+                oninput="editEdgeWeightSlider(this.value)"
+                class="w-full accent-indigo-500"
+              />
+              <input
+                type="number"
+                id="edge-weight-input"
+                min="1"
+                max="999"
+                oninput="editEdgeWeightInput(this.value)"
+                class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <!-- Badge Edge Info (only visible in Badge Mode) -->
+            <div
+              id="badge-edge-info"
+              class="p-3 bg-zinc-950 rounded-lg border border-zinc-800 space-y-2 hidden"
+            >
+              <span class="text-xs font-bold text-emerald-400 block"
+                >Badge Prerequisite Cost</span
+              >
+              <p class="text-[11px] text-zinc-500 leading-normal">
+                In Badge Mode, the weight of this prerequisite link is bound to
+                the target node's check-in requirements.
+              </p>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-zinc-400">Target Node:</span>
+                <span id="badge-edge-target-name" class="font-bold text-white"
+                  >Badge B</span
+                >
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-zinc-400">Required Check-ins:</span>
+                <span
+                  id="badge-edge-target-req"
+                  class="font-bold text-emerald-400"
+                  >2</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Interactive SVG Canvas -->
+      <main
+        class="flex-1 bg-zinc-950 relative flex items-center justify-center overflow-hidden select-none"
+      >
+        <!-- Zoom/Pan Toolbar (Bottom Center overlay) -->
+        <div
+          class="absolute bottom-6 left-6 z-10 flex items-center gap-2 bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-1.5 shadow-xl"
+        >
+          <button
+            onclick="zoomCanvas(1.2)"
+            class="w-8 h-8 rounded-lg bg-zinc-950 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center transition"
+            title="Zoom In"
+          >
+            <i class="fa-solid fa-plus"></i>
+          </button>
+          <button
+            onclick="zoomCanvas(0.8)"
+            class="w-8 h-8 rounded-lg bg-zinc-950 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center transition"
+            title="Zoom Out"
+          >
+            <i class="fa-solid fa-minus"></i>
+          </button>
+          <button
+            onclick="resetZoomPan()"
+            class="px-3 h-8 rounded-lg bg-zinc-950 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center text-xs font-semibold transition"
+            title="Reset View"
+          >
+            Reset
+          </button>
+        </div>
+
+        <!-- Canvas instructions overlay -->
+        <div
+          class="absolute top-6 left-6 pointer-events-none bg-zinc-900/40 backdrop-blur-sm border border-zinc-800/40 rounded-xl p-3 text-xs text-zinc-400 space-y-1"
+        >
+          <div class="flex items-center gap-2">
+            <kbd
+              class="bg-zinc-950 border border-zinc-800 px-1 py-0.5 rounded text-[10px] text-zinc-300"
+              >Double Click</kbd
+            >
+            <span>Create Node</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <kbd
+              class="bg-zinc-950 border border-zinc-800 px-1 py-0.5 rounded text-[10px] text-zinc-300"
+              >Drag Node</kbd
+            >
+            <span>Reposition</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <kbd
+              class="bg-zinc-950 border border-zinc-800 px-1 py-0.5 rounded text-[10px] text-zinc-300"
+              >Drag from Node</kbd
+            >
+            <span>Link (in Add Edge Mode)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <kbd
+              class="bg-zinc-950 border border-zinc-800 px-1 py-0.5 rounded text-[10px] text-zinc-300"
+              >Click</kbd
+            >
+            <span>Select or Delete (in Eraser Mode)</span>
+          </div>
+        </div>
+
+        <!-- SVG Graph Container -->
+        <svg
+          id="graph-svg"
+          class="w-full h-full canvas-grid cursor-grab active:cursor-grabbing"
+          onmousedown="onCanvasMouseDown(event)"
+          ondblclick="onCanvasDblClick(event)"
+        >
+          <defs>
+            <!-- Directed Arrow markers -->
+            <marker
+              id="arrow"
+              viewBox="0 0 10 10"
+              refX="28"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#52525b" />
+            </marker>
+            <marker
+              id="arrow-selected"
+              viewBox="0 0 10 10"
+              refX="28"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+            </marker>
+            <marker
+              id="arrow-shortest"
+              viewBox="0 0 10 10"
+              refX="28"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#6366f1" />
+            </marker>
+            <marker
+              id="arrow-active"
+              viewBox="0 0 10 10"
+              refX="28"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+            </marker>
+
+            <!-- Glow filter for paths -->
+            <filter
+              id="glow-violet"
+              x="-20%"
+              y="-20%"
+              width="140%"
+              height="140%"
+            >
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <!-- Zoom and pan group wrapper -->
+          <g id="zoom-group" transform="translate(0, 0) scale(1)">
+            <!-- Edge Paths group (Drawn below nodes) -->
+            <g id="edges-group"></g>
+            <!-- Node Groups -->
+            <g id="nodes-group"></g>
+            <!-- Interactive temporary drawing edge line -->
+            <path
+              id="temp-edge"
+              class="hidden stroke-indigo-400 stroke-2 stroke-dasharray-4 fill-none"
+              d=""
+            />
+          </g>
+        </svg>
+      </main>
+
+      <!-- Right Sidebar: Dijkstra Simulator -->
+      <aside
+        class="w-96 bg-zinc-900/50 backdrop-blur-md border-l border-zinc-800 flex flex-col overflow-hidden"
+      >
+        <!-- Standard Dijkstra Simulator Panel -->
+        <div id="dijkstra-panel" class="flex-1 flex flex-col overflow-hidden">
+          <!-- Simulator Control panel -->
+          <div class="p-4 border-b border-zinc-800">
+            <h2
+              class="text-md font-bold tracking-tight mb-3 flex items-center justify-between"
+            >
+              <span>Dijkstra Emulation</span>
+              <span
+                id="sim-status"
+                class="text-xs bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded text-zinc-400 uppercase tracking-wider font-semibold"
+                >Idle</span
+              >
+            </h2>
+
+            <!-- Simulator Buttons -->
+            <div class="grid grid-cols-4 gap-2 mb-4">
+              <button
+                id="sim-reset-btn"
+                onclick="resetSimulation()"
+                class="py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 flex flex-col items-center gap-1 transition"
+              >
+                <i class="fa-solid fa-rotate-left"></i>
+                <span>Reset</span>
+              </button>
+              <button
+                id="sim-prev-btn"
+                onclick="stepBackward()"
+                disabled
+                class="py-2 bg-zinc-800/50 text-zinc-500 text-xs font-semibold rounded-lg border border-zinc-850 flex flex-col items-center gap-1 transition disabled:opacity-40"
+              >
+                <i class="fa-solid fa-backward-step"></i>
+                <span>Prev</span>
+              </button>
+              <button
+                id="sim-play-btn"
+                onclick="togglePlaySimulation()"
+                class="py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg flex flex-col items-center gap-1 transition shadow-lg shadow-indigo-500/10"
+              >
+                <i id="sim-play-icon" class="fa-solid fa-play"></i>
+                <span id="sim-play-text">Play</span>
+              </button>
+              <button
+                id="sim-next-btn"
+                onclick="stepForward()"
+                class="py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg border border-zinc-700 flex flex-col items-center gap-1 transition"
+              >
+                <i class="fa-solid fa-forward-step"></i>
+                <span>Next</span>
+              </button>
+            </div>
+
+            <!-- Simulation Speed & Step Count -->
+            <div class="space-y-3">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-zinc-400">Step:</span>
+                <span
+                  id="sim-step-count"
+                  class="font-mono font-bold text-indigo-400"
+                  >0 / 0</span
+                >
+              </div>
+              <div>
+                <div class="flex justify-between items-center text-xs mb-1">
+                  <span class="text-zinc-400">Simulation Speed</span>
+                  <span id="sim-speed-val" class="font-mono text-zinc-400"
+                    >1000ms</span
+                  >
+                </div>
+                <input
+                  type="range"
+                  id="sim-speed-slider"
+                  min="200"
+                  max="2500"
+                  step="100"
+                  value="1000"
+                  onchange="updateSimSpeed(this.value)"
+                  class="w-full accent-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic step explanation log -->
+          <div class="p-4 border-b border-zinc-800 bg-zinc-950/40">
+            <h3
+              class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2"
+            >
+              Step Log Explanation
+            </h3>
+            <div
+              id="sim-log"
+              class="text-xs leading-relaxed text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg p-3 h-20 overflow-y-auto no-scrollbar font-sans"
+            >
+              Click <strong>Play</strong> or <strong>Next</strong> to start
+              tracing path calculation from the start node.
+            </div>
+          </div>
+
+          <!-- State tables: Distance, Queue -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+            <!-- Priority Queue / Queue Frontier -->
+            <div>
+              <h3
+                class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 flex items-center justify-between"
+              >
+                <span>Frontier / Priority Queue</span>
+                <span
+                  id="frontier-count"
+                  class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono"
+                  >Empty</span
+                >
+              </h3>
+              <div
+                class="bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden"
+              >
+                <table class="w-full text-xs text-left">
+                  <thead
+                    class="bg-zinc-900 text-zinc-400 uppercase text-[9px] tracking-wider border-b border-zinc-800"
+                  >
+                    <tr>
+                      <th class="px-3 py-2">Node</th>
+                      <th class="px-3 py-2 text-right">Tentative Distance</th>
+                    </tr>
+                  </thead>
+                  <tbody id="frontier-table-body">
+                    <tr>
+                      <td
+                        colspan="2"
+                        class="px-3 py-4 text-center text-zinc-600"
+                      >
+                        Queue is currently empty
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Distance Table -->
+            <div>
+              <h3
+                class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2"
+              >
+                Algorithm Table State
+              </h3>
+              <div
+                class="bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden"
+              >
+                <table class="w-full text-xs text-left">
+                  <thead
+                    class="bg-zinc-900 text-zinc-400 uppercase text-[9px] tracking-wider border-b border-zinc-800"
+                  >
+                    <tr>
+                      <th class="px-3 py-2">Node</th>
+                      <th class="px-3 py-2">Cost</th>
+                      <th class="px-3 py-2">Predecessor</th>
+                      <th class="px-3 py-2 text-right">State</th>
+                    </tr>
+                  </thead>
+                  <tbody id="state-table-body">
+                    <!-- Generated Dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom Badge Simulator panel container -->
+        <div
+          id="badge-panel"
+          class="flex-1 flex flex-col overflow-hidden hidden bg-zinc-900/10"
+        >
+          <!-- Model Selection -->
+          <div class="p-4 border-b border-zinc-800">
+            <h2 class="text-sm font-bold tracking-tight mb-2">
+              Badge Granting Rules
+            </h2>
+            <div class="space-y-2">
+              <label class="text-xs text-zinc-400 block mb-1"
+                >Select Rule Model Strategy:</label
+              >
+              <div
+                class="flex flex-col gap-1 bg-zinc-950 p-1 border border-zinc-800 rounded-lg"
+              >
+                <label
+                  class="flex items-center gap-2 p-2 rounded hover:bg-zinc-900 transition cursor-pointer text-xs"
+                >
+                  <input
+                    type="radio"
+                    name="badge-rule-model"
+                    value="satisfaction"
+                    checked
+                    onchange="toggleBadgeRuleModel(this.value)"
+                    class="accent-emerald-500"
+                  />
+                  <div>
+                    <span class="font-bold text-emerald-400 block text-[11px]"
+                      >Historical Satisfaction (New Model)</span
+                    >
+                    <span class="text-[10px] text-zinc-500 block leading-tight"
+                      >Faded badges are bypassed historically. Downstream badges
+                      remain unlockable.</span
+                    >
+                  </div>
+                </label>
+                <label
+                  class="flex items-center gap-2 p-2 rounded hover:bg-zinc-900 transition cursor-pointer text-xs"
+                >
+                  <input
+                    type="radio"
+                    name="badge-rule-model"
+                    value="possession"
+                    onchange="toggleBadgeRuleModel(this.value)"
+                    class="accent-emerald-500"
+                  />
+                  <div>
+                    <span class="font-bold text-zinc-400 block text-[11px]"
+                      >Badge Possession (Old Model)</span
+                    >
+                    <span class="text-[10px] text-zinc-500 block leading-tight"
+                      >Faded badges are blocked. Downstream badges become
+                      permanently locked.</span
+                    >
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Simulate User Check-ins -->
+          <div class="p-4 border-b border-zinc-800 bg-zinc-950/40">
+            <h3
+              class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2"
+            >
+              Simulate User Check-ins
+            </h3>
+            <div class="grid grid-cols-2 gap-2" id="badge-checkins-manager">
+              <!-- Dynamically populated checkin counters for areas -->
+            </div>
+            <button
+              onclick="resetBadgeCheckins()"
+              class="w-full mt-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1"
+            >
+              <i class="fa-solid fa-rotate-left"></i> Reset Check-ins
+            </button>
+          </div>
+
+          <!-- Explanatory log / state description -->
+          <div class="p-4 border-b border-zinc-800">
+            <h3
+              class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2"
+            >
+              Badge Emulation Log
+            </h3>
+            <div
+              id="badge-sim-log"
+              class="text-xs leading-relaxed text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg p-3 h-24 overflow-y-auto no-scrollbar font-sans"
+            >
+              Modify the check-in count above to simulate unlocking badges.
+            </div>
+          </div>
+
+          <!-- Live Badge State Checklist Table -->
+          <div class="flex-1 overflow-y-auto p-4 no-scrollbar">
+            <h3
+              class="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2"
+            >
+              Live Badge Status
+            </h3>
+            <div
+              class="bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden"
+            >
+              <table class="w-full text-xs text-left">
+                <thead
+                  class="bg-zinc-900 text-zinc-400 uppercase text-[9px] tracking-wider border-b border-zinc-800"
+                >
+                  <tr>
+                    <th class="px-3 py-2">Badge</th>
+                    <th class="px-3 py-2">Status</th>
+                    <th class="px-3 py-2 text-center">Satisfied?</th>
+                    <th class="px-3 py-2 text-right">Acquired?</th>
+                  </tr>
+                </thead>
+                <tbody id="badge-status-table-body">
+                  <!-- Dynamically generated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- JavaScript Graph Controller -->
+    <script>
+      // --- Graph State & Configuration ---
+      let nodes = [];
+      let edges = [];
+      let startNodeId = null;
+      let selectedNode = null;
+      let selectedEdge = null;
+      let currentMode = "pointer"; // pointer, edge, eraser
+      let needsDOMRebuild = true;
+
+      // Badge Emulation State
+      let isBadgeMode = false;
+      let badgeRuleModel = "satisfaction"; // satisfaction (new), possession (old)
+      let badgeCheckins = {
+        "Area 1": 0,
+        "Area 2": 0,
+        "Area 3": 0,
+        "Area 4": 0,
+      };
+
+      // Pan/Zoom Configuration
+      let panX = 0;
+      let panY = 0;
+      let scale = 1;
+      let isPanning = false;
+      let startPanX = 0;
+      let startPanY = 0;
+
+      // Interaction States
+      let activeDragNode = null;
+      let dragOffset = { x: 0, y: 0 };
+      let isDraggingCanvas = false;
+      let edgeSourceNode = null;
+
+      // Simulation States
+      let simSteps = [];
+      let simCurrentIndex = -1;
+      let simIntervalId = null;
+      let simSpeed = 1000;
+      let isSimulating = false;
+
+      // --- SVG Nodes & Selection Elements ---
+      const svg = document.getElementById("graph-svg");
+      const zoomGroup = document.getElementById("zoom-group");
+      const nodesGroup = document.getElementById("nodes-group");
+      const edgesGroup = document.getElementById("edges-group");
+      const tempEdge = document.getElementById("temp-edge");
+
+      // --- Init ---
+      window.addEventListener("DOMContentLoaded", () => {
+        loadPreset("dijkstra");
+
+        // Handle Keyboard shortcuts
+        window.addEventListener("keydown", (e) => {
+          if (e.key === "Delete" || e.key === "Backspace") {
+            if (selectedNode) {
+              deleteNode(selectedNode.id);
+              selectNode(null);
+            } else if (selectedEdge) {
+              deleteEdge(selectedEdge.id);
+              selectEdge(null);
+            }
+          }
+        });
+
+        // Add global mousemove/mouseup listeners to window to prevent "stuck drag"
+        window.addEventListener("mousemove", (e) => {
+          onCanvasMouseMove(e);
+        });
+        window.addEventListener("mouseup", (e) => {
+          onCanvasMouseUp(e);
+        });
+      });
+
+      // --- Presets Configurations ---
+      const PRESETS = {
+        linear: {
+          nodes: [
+            { id: "A", name: "Start (A)", x: 100, y: 300, isStart: true },
+            { id: "B", name: "Node B", x: 250, y: 300 },
+            { id: "C", name: "Node C", x: 400, y: 300 },
+            { id: "D", name: "Node D", x: 550, y: 300 },
+            { id: "E", name: "Target (E)", x: 700, y: 300 },
+          ],
+          edges: [
+            { id: "A-B", source: "A", target: "B", weight: 4 },
+            { id: "B-C", source: "B", target: "C", weight: 2 },
+            { id: "C-D", source: "C", target: "D", weight: 5 },
+            { id: "D-E", source: "D", target: "E", weight: 1 },
+          ],
+        },
+        binary: {
+          nodes: [
+            { id: "A", name: "Root (A)", x: 400, y: 100, isStart: true },
+            { id: "B", name: "Node B", x: 250, y: 220 },
+            { id: "C", name: "Node C", x: 550, y: 220 },
+            { id: "D", name: "Node D", x: 150, y: 340 },
+            { id: "E", name: "Node E", x: 350, y: 340 },
+            { id: "F", name: "Node F", x: 450, y: 340 },
+            { id: "G", name: "Node G", x: 650, y: 340 },
+          ],
+          edges: [
+            { id: "A-B", source: "A", target: "B", weight: 2 },
+            { id: "A-C", source: "A", target: "C", weight: 5 },
+            { id: "B-D", source: "B", target: "D", weight: 4 },
+            { id: "B-E", source: "B", target: "E", weight: 3 },
+            { id: "C-F", source: "C", target: "F", weight: 1 },
+            { id: "C-G", source: "C", target: "G", weight: 6 },
+          ],
+        },
+        diamond: {
+          nodes: [
+            { id: "A", name: "Start", x: 100, y: 300, isStart: true },
+            { id: "B", name: "Upper Path", x: 350, y: 150 },
+            { id: "C", name: "Lower Path", x: 350, y: 450 },
+            { id: "D", name: "Destination", x: 600, y: 300 },
+          ],
+          edges: [
+            { id: "A-B", source: "A", target: "B", weight: 5 },
+            { id: "A-C", source: "A", target: "C", weight: 2 },
+            { id: "B-D", source: "B", target: "D", weight: 3 },
+            { id: "C-D", source: "C", target: "D", weight: 7 },
+            { id: "B-C", source: "B", target: "C", weight: 1 }, // Bi-directional connection offset test
+          ],
+        },
+        grid: {
+          nodes: [
+            { id: "A", name: "A", x: 150, y: 150, isStart: true },
+            { id: "B", name: "B", x: 350, y: 150 },
+            { id: "C", name: "C", x: 550, y: 150 },
+            { id: "D", name: "D", x: 150, y: 350 },
+            { id: "E", name: "E", x: 350, y: 350 },
+            { id: "F", name: "F", x: 550, y: 350 },
+          ],
+          edges: [
+            { id: "A-B", source: "A", target: "B", weight: 3 },
+            { id: "B-C", source: "B", target: "C", weight: 4 },
+            { id: "A-D", source: "A", target: "D", weight: 2 },
+            { id: "B-E", source: "B", target: "E", weight: 1 },
+            { id: "C-F", source: "C", target: "F", weight: 5 },
+            { id: "D-E", source: "D", target: "E", weight: 6 },
+            { id: "E-F", source: "E", target: "F", weight: 2 },
+            { id: "D-A", source: "D", target: "A", weight: 4 }, // Cycle
+          ],
+        },
+        dijkstra: {
+          nodes: [
+            { id: "A", name: "Start Node", x: 100, y: 250, isStart: true },
+            { id: "B", name: "Node B", x: 280, y: 120 },
+            { id: "C", name: "Node C", x: 280, y: 380 },
+            { id: "D", name: "Node D", x: 480, y: 120 },
+            { id: "E", name: "Node E", x: 480, y: 380 },
+            { id: "F", name: "Target Node", x: 650, y: 250 },
+            { id: "G", name: "Island G", x: 750, y: 400 }, // Unreachable node
+          ],
+          edges: [
+            { id: "A-B", source: "A", target: "B", weight: 4 },
+            { id: "A-C", source: "A", target: "C", weight: 2 },
+            { id: "B-C", source: "B", target: "C", weight: 5 },
+            { id: "C-B", source: "C", target: "B", weight: 1 },
+            { id: "B-D", source: "B", target: "D", weight: 10 },
+            { id: "C-E", source: "C", target: "E", weight: 3 },
+            { id: "E-D", source: "E", target: "D", weight: 4 },
+            { id: "D-F", source: "D", target: "F", weight: 11 },
+            { id: "E-F", source: "E", target: "F", weight: 5 },
+          ],
+        },
+        badges: {
+          nodes: [
+            {
+              id: "W",
+              name: "Badge Wellcome",
+              x: 150,
+              y: 250,
+              isStart: true,
+              status: "active",
+              requiredCheckins: 1,
+              areaId: "Cualquiera",
+            },
+            {
+              id: "A",
+              name: "Badge A",
+              x: 350,
+              y: 130,
+              status: "faded",
+              requiredCheckins: 2,
+              areaId: "Zone A",
+            },
+            {
+              id: "B",
+              name: "Badge B",
+              x: 350,
+              y: 250,
+              status: "faded",
+              requiredCheckins: 2,
+              areaId: "Zone B",
+            },
+            {
+              id: "C",
+              name: "Badge C",
+              x: 350,
+              y: 370,
+              status: "active",
+              requiredCheckins: 2,
+              areaId: "Zone C",
+            },
+            {
+              id: "E",
+              name: "Badge Expert",
+              x: 550,
+              y: 250,
+              status: "active",
+              requiredCheckins: 0,
+              areaId: "Cualquiera",
+            },
+          ],
+          edges: [
+            { id: "W-A", source: "W", target: "A", weight: 1 },
+            { id: "W-B", source: "W", target: "B", weight: 1 },
+            { id: "W-C", source: "W", target: "C", weight: 1 },
+            { id: "A-E", source: "A", target: "E", weight: 1 },
+            { id: "B-E", source: "B", target: "E", weight: 1 },
+            { id: "C-E", source: "C", target: "E", weight: 1 },
+          ],
+        },
+      };
+
+      function loadPreset(name) {
+        resetSimulation();
+        const preset = PRESETS[name];
+        if (!preset) return;
+
+        // Deep Copy Preset
+        nodes = preset.nodes.map((n) => ({ ...n }));
+        edges = preset.edges.map((e) => ({ ...e }));
+
+        // Detect start node
+        const start = nodes.find((n) => n.isStart);
+        startNodeId = start ? start.id : nodes.length > 0 ? nodes[0].id : null;
+        if (nodes.length > 0 && !start) {
+          nodes[0].isStart = true;
+        }
+
+        // Toggle Badge Mode vs Dijkstra Mode
+        const dijkstraPanel = document.getElementById("dijkstra-panel");
+        const badgePanel = document.getElementById("badge-panel");
+        const badgeNodeSettings = document.getElementById(
+          "badge-node-settings",
+        );
+        const nodeCostContainer = document.getElementById(
+          "node-cost-container",
+        );
+
+        if (name === "badges") {
+          isBadgeMode = true;
+          dijkstraPanel.classList.add("hidden");
+          badgePanel.classList.remove("hidden");
+          badgeNodeSettings.classList.remove("hidden");
+          nodeCostContainer.classList.add("hidden");
+          resetBadgeCheckins();
+        } else {
+          isBadgeMode = false;
+          dijkstraPanel.classList.remove("hidden");
+          badgePanel.classList.add("hidden");
+          badgeNodeSettings.classList.add("hidden");
+          nodeCostContainer.classList.remove("hidden");
+        }
+
+        selectNode(null);
+        selectEdge(null);
+        resetZoomPan();
+        needsDOMRebuild = true;
+        updatePathsAndCosts();
+      }
+
+      // --- Drawing Canvas & Coordinate Helpers ---
+      function getSVGCoords(event) {
+        const rect = svg.getBoundingClientRect();
+        const rawX = event.clientX - rect.left;
+        const rawY = event.clientY - rect.top;
+
+        // Adjust coordinates based on zoom scale and translation panning offsets
+        return {
+          x: (rawX - panX) / scale,
+          y: (rawY - panY) / scale,
+        };
+      }
+
+      function generateUniqueId() {
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        // Find unused single-letter ID
+        for (let char of alphabet) {
+          if (!nodes.find((n) => n.id === char)) return char;
+        }
+        // Fallback to random alphanumeric string
+        return Math.random().toString(36).substr(2, 5).toUpperCase();
+      }
+
+      function clearGraph() {
+        resetSimulation();
+        nodes = [];
+        edges = [];
+        startNodeId = null;
+        selectNode(null);
+        selectEdge(null);
+        needsDOMRebuild = true;
+        updatePathsAndCosts();
+      }
+
+      // --- Selection & Editing Functions ---
+      function selectNode(node) {
+        selectedNode = node;
+        selectedEdge = null;
+
+        const nInspector = document.getElementById("inspector-node");
+        const eInspector = document.getElementById("inspector-edge");
+        const emptyInspector = document.getElementById("inspector-empty");
+
+        // Reset edge highlighting on selecting a new node
+        updatePathsAndCosts();
+
+        if (node) {
+          emptyInspector.classList.add("hidden");
+          eInspector.classList.add("hidden");
+          nInspector.classList.remove("hidden");
+
+          document.getElementById("node-badge-id").innerText =
+            `Node ${node.id}`;
+          document.getElementById("node-name-input").value =
+            node.name || node.id;
+
+          // Populate Badge Config if present
+          if (isBadgeMode) {
+            if (!node.status) node.status = "active";
+            if (!node.areaId) node.areaId = "Area 1";
+            if (node.requiredCheckins === undefined) node.requiredCheckins = 1;
+
+            document.getElementById("node-status-select").value = node.status;
+            document.getElementById("node-area-select").value = node.areaId;
+            document.getElementById("node-req-checkins-input").value =
+              node.requiredCheckins;
+            document.getElementById("node-req-checkins-display").innerText =
+              node.requiredCheckins;
+          }
+
+          // Show shortest path cost in Inspector
+          const cost =
+            node.minCost === Infinity ? "Unreachable (∞)" : node.minCost;
+          document.getElementById("node-inspector-cost").innerText = cost;
+
+          // Highlight corresponding node element in UI
+          const circleEl = document.getElementById(`circle-${node.id}`);
+          if (circleEl) circleEl.setAttribute("stroke", "#818cf8");
+        } else {
+          nInspector.classList.add("hidden");
+          if (!selectedEdge) emptyInspector.classList.remove("hidden");
+        }
+      }
+
+      // Mouse hover callback to highlight shortest path
+      svg.addEventListener("mouseover", (e) => {
+        if (isSimulating) return;
+        const nodeGroup = e.target.closest("g");
+        if (nodeGroup && nodeGroup.id && nodeGroup.id.startsWith("node-")) {
+          const nodeId = nodeGroup.id.substring(5);
+          const node = nodes.find((n) => n.id === nodeId);
+          if (node && node.minCost !== Infinity) {
+            highlightShortestPathToNode(node);
+          }
+        }
+      });
+
+      svg.addEventListener("mouseout", (e) => {
+        if (isSimulating) return;
+        const nodeGroup = e.target.closest("g");
+        if (nodeGroup && nodeGroup.id && nodeGroup.id.startsWith("node-")) {
+          updatePathsAndCosts();
+        }
+      });
+
+      function selectEdge(edge) {
+        selectedEdge = edge;
+        selectedNode = null;
+
+        const nInspector = document.getElementById("inspector-node");
+        const eInspector = document.getElementById("inspector-edge");
+        const emptyInspector = document.getElementById("inspector-empty");
+
+        updatePathsAndCosts();
+
+        if (edge) {
+          emptyInspector.classList.add("hidden");
+          nInspector.classList.add("hidden");
+          eInspector.classList.remove("hidden");
+
+          document.getElementById("edge-badge-name").innerText =
+            `${edge.source} → ${edge.target}`;
+
+          const weightContainer = document.getElementById(
+            "edge-weight-container",
+          );
+          const badgeEdgeInfo = document.getElementById("badge-edge-info");
+
+          if (isBadgeMode) {
+            weightContainer.classList.add("hidden");
+            badgeEdgeInfo.classList.remove("hidden");
+
+            const targetNode = nodes.find((n) => n.id === edge.target);
+            const targetName = targetNode
+              ? targetNode.name || targetNode.id
+              : edge.target;
+            const targetReq = targetNode ? targetNode.requiredCheckins || 0 : 0;
+
+            document.getElementById("badge-edge-target-name").innerText =
+              targetName;
+            document.getElementById("badge-edge-target-req").innerText =
+              targetReq;
+          } else {
+            weightContainer.classList.remove("hidden");
+            badgeEdgeInfo.classList.add("hidden");
+
+            document.getElementById("edge-weight-display").innerText =
+              edge.weight;
+            document.getElementById("edge-weight-slider").value = Math.min(
+              edge.weight,
+              99,
+            );
+            document.getElementById("edge-weight-input").value = edge.weight;
+          }
+
+          // Highlight edge in SVG
+          const pathEl = document.getElementById(`edge-${edge.id}`);
+          if (pathEl) {
+            pathEl.setAttribute("stroke", "#f59e0b");
+            pathEl.setAttribute("marker-end", "url(#arrow-selected)");
+          }
+        } else {
+          eInspector.classList.add("hidden");
+          if (!selectedNode) emptyInspector.classList.remove("hidden");
+        }
+      }
+
+      function editNodeLabel() {
+        if (!selectedNode) return;
+        const inputVal = document
+          .getElementById("node-name-input")
+          .value.trim();
+        selectedNode.name = inputVal || selectedNode.id;
+        updatePathsAndCosts();
+      }
+
+      function setNodeAsStart() {
+        if (!selectedNode) return;
+        nodes.forEach((n) => (n.isStart = false));
+        selectedNode.isStart = true;
+        startNodeId = selectedNode.id;
+        resetSimulation();
+        updatePathsAndCosts();
+      }
+
+      function editEdgeWeightSlider(val) {
+        if (!selectedEdge) return;
+        selectedEdge.weight = parseInt(val, 10) || 1;
+        document.getElementById("edge-weight-display").innerText =
+          selectedEdge.weight;
+        document.getElementById("edge-weight-input").value =
+          selectedEdge.weight;
+        resetSimulation();
+        updatePathsAndCosts();
+      }
+
+      function editEdgeWeightInput(val) {
+        if (!selectedEdge) return;
+        const num = parseInt(val, 10) || 1;
+        selectedEdge.weight = Math.max(1, num);
+        document.getElementById("edge-weight-display").innerText =
+          selectedEdge.weight;
+        document.getElementById("edge-weight-slider").value = Math.min(
+          selectedEdge.weight,
+          99,
+        );
+        resetSimulation();
+        updatePathsAndCosts();
+      }
+
+      // --- Node/Edge Operations ---
+      function deleteNode(id) {
+        resetSimulation();
+        nodes = nodes.filter((n) => n.id !== id);
+        edges = edges.filter((e) => e.source !== id && e.target !== id);
+        if (startNodeId === id) {
+          startNodeId = nodes.length > 0 ? nodes[0].id : null;
+          if (nodes.length > 0) nodes[0].isStart = true;
+        }
+        needsDOMRebuild = true;
+        updatePathsAndCosts();
+      }
+
+      function deleteEdge(id) {
+        resetSimulation();
+        edges = edges.filter((e) => e.id !== id);
+        needsDOMRebuild = true;
+        updatePathsAndCosts();
+      }
+
+      function setMode(mode) {
+        currentMode = mode;
+
+        // Update mode buttons UI
+        const modes = ["pointer", "edge", "eraser"];
+        modes.forEach((m) => {
+          const btn = document.getElementById(`mode-${m}`);
+          if (m === mode) {
+            btn.classList.add(
+              "bg-indigo-500/10",
+              "text-indigo-400",
+              "border-indigo-500/20",
+            );
+            btn.classList.remove("text-zinc-400");
+          } else {
+            btn.classList.remove(
+              "bg-indigo-500/10",
+              "text-indigo-400",
+              "border-indigo-500/20",
+            );
+            btn.classList.add("text-zinc-400");
+          }
+        });
+
+        // Reset temp edge
+        tempEdge.classList.add("hidden");
+        edgeSourceNode = null;
+      }
+
+      // --- Zoom & Pan Logic ---
+      function zoomCanvas(amount) {
+        scale = Math.min(Math.max(scale * amount, 0.25), 4);
+        applyZoomPanTransform();
+      }
+
+      function resetZoomPan() {
+        scale = 1;
+        panX = 0;
+        panY = 0;
+        applyZoomPanTransform();
+      }
+
+      function applyZoomPanTransform() {
+        zoomGroup.setAttribute(
+          "transform",
+          `translate(${panX}, ${panY}) scale(${scale})`,
+        );
+      }
+
+      // --- Canvas Event Handlers ---
+      function onCanvasMouseDown(e) {
+        // Check if user is clicking on empty space to pan the canvas
+        if (e.target === svg || e.target.classList.contains("canvas-grid")) {
+          isDraggingCanvas = true;
+          startPanX = e.clientX - panX;
+          startPanY = e.clientY - panY;
+          return;
+        }
+      }
+
+      function onCanvasMouseMove(e) {
+        const coords = getSVGCoords(e);
+
+        // Pan canvas
+        if (isDraggingCanvas) {
+          panX = e.clientX - startPanX;
+          panY = e.clientY - startPanY;
+          applyZoomPanTransform();
+          return;
+        }
+
+        // Drag existing node
+        if (activeDragNode) {
+          let newX = coords.x + dragOffset.x;
+          let newY = coords.y + dragOffset.y;
+
+          // Grid snap implementation
+          const gridSnap =
+            document.getElementById("snap-grid-checkbox").checked;
+          if (gridSnap) {
+            newX = Math.round(newX / 20) * 20;
+            newY = Math.round(newY / 20) * 20;
+          }
+
+          activeDragNode.x = newX;
+          activeDragNode.y = newY;
+          updatePathsAndCosts();
+          return;
+        }
+
+        // Draw linking edge line live
+        if (currentMode === "edge" && edgeSourceNode) {
+          const targetNode = findNodeNearCoords(coords.x, coords.y, 25);
+          let targetX = coords.x;
+          let targetY = coords.y;
+
+          if (targetNode) {
+            targetX = targetNode.x;
+            targetY = targetNode.y;
+          }
+
+          // Draw straight line visual to cursor
+          tempEdge.setAttribute(
+            "d",
+            `M ${edgeSourceNode.x} ${edgeSourceNode.y} L ${targetX} ${targetY}`,
+          );
+          tempEdge.classList.remove("hidden");
+        }
+      }
+
+      function onCanvasMouseUp(e) {
+        isDraggingCanvas = false;
+        activeDragNode = null;
+
+        if (currentMode === "edge" && edgeSourceNode) {
+          const coords = getSVGCoords(e);
+          const targetNode = findNodeNearCoords(coords.x, coords.y, 25);
+
+          if (targetNode && targetNode.id !== edgeSourceNode.id) {
+            // Create Edge if not exists
+            const edgeId = `${edgeSourceNode.id}-${targetNode.id}`;
+            if (!edges.find((edge) => edge.id === edgeId)) {
+              edges.push({
+                id: edgeId,
+                source: edgeSourceNode.id,
+                target: targetNode.id,
+                weight: 1,
+              });
+              resetSimulation();
+              needsDOMRebuild = true;
+              updatePathsAndCosts();
+            }
+          }
+
+          tempEdge.classList.add("hidden");
+          edgeSourceNode = null;
+        }
+      }
+
+      function onCanvasDblClick(e) {
+        // Only add node on double click in pointer mode and on empty space
+        if (currentMode !== "pointer") return;
+        if (e.target !== svg && !e.target.classList.contains("canvas-grid"))
+          return;
+
+        const coords = getSVGCoords(e);
+        let finalX = coords.x;
+        let finalY = coords.y;
+
+        if (document.getElementById("snap-grid-checkbox").checked) {
+          finalX = Math.round(finalX / 20) * 20;
+          finalY = Math.round(finalY / 20) * 20;
+        }
+
+        const id = generateUniqueId();
+        const node = {
+          id: id,
+          name: `Node ${id}`,
+          x: finalX,
+          y: finalY,
+          isStart: nodes.length === 0,
+        };
+
+        if (nodes.length === 0) startNodeId = id;
+        nodes.push(node);
+        needsDOMRebuild = true;
+        updatePathsAndCosts();
+      }
+
+      function findNodeNearCoords(x, y, radius) {
+        return nodes.find((node) => {
+          const dx = node.x - x;
+          const dy = node.y - y;
+          return Math.sqrt(dx * dx + dy * dy) <= radius;
+        });
+      }
+
+      // --- Node & Edge Element Listeners ---
+      function onNodeMouseDown(e, nodeId) {
+        e.stopPropagation();
+        const node = nodes.find((n) => n.id === nodeId);
+        if (!node) return;
+
+        if (currentMode === "eraser") {
+          deleteNode(nodeId);
+          selectNode(null);
+          return;
+        }
+
+        if (currentMode === "edge") {
+          edgeSourceNode = node;
+          return;
+        }
+
+        // Normal pointer mode drag setup
+        activeDragNode = node;
+        const coords = getSVGCoords(e);
+        dragOffset.x = node.x - coords.x;
+        dragOffset.y = node.y - coords.y;
+
+        selectNode(node);
+      }
+
+      function onEdgeClick(e, edgeId) {
+        e.stopPropagation();
+        const edge = edges.find((ed) => ed.id === edgeId);
+        if (!edge) return;
+
+        if (currentMode === "eraser") {
+          deleteEdge(edgeId);
+          selectEdge(null);
+          return;
+        }
+
+        selectEdge(edge);
+      }
+
+      // --- Dijkstra Core Math Logic ---
+      function getEdgeWeight(edge) {
+        if (isBadgeMode) {
+          const targetNode = nodes.find((n) => n.id === edge.target);
+          return targetNode ? targetNode.requiredCheckins || 0 : 0;
+        }
+        return edge.weight;
+      }
+
+      function computeStaticDijkstra() {
+        if (!startNodeId || nodes.length === 0) return;
+
+        // 1. Initial State Setup
+        const distances = {};
+        const predecessors = {};
+        const unvisited = new Set();
+
+        nodes.forEach((n) => {
+          distances[n.id] = Infinity;
+          predecessors[n.id] = null;
+          unvisited.add(n.id);
+        });
+
+        const startNode = nodes.find((n) => n.id === startNodeId);
+        const startDist =
+          isBadgeMode && startNode ? startNode.requiredCheckins || 0 : 0;
+        distances[startNodeId] = startDist;
+
+        // 2. Loop until no unvisited nodes or minimum node distance is infinity
+        while (unvisited.size > 0) {
+          // Find node with minimum distance in unvisited set
+          let minNode = null;
+          let minDist = Infinity;
+
+          unvisited.forEach((nodeId) => {
+            if (distances[nodeId] < minDist) {
+              minDist = distances[nodeId];
+              minNode = nodeId;
+            }
+          });
+
+          if (minNode === null || minDist === Infinity) break;
+
+          unvisited.delete(minNode);
+
+          // Check out-going edges from minNode
+          const outgoingEdges = edges.filter((e) => e.source === minNode);
+          outgoingEdges.forEach((edge) => {
+            if (!unvisited.has(edge.target)) return;
+            const alt = distances[minNode] + getEdgeWeight(edge);
+            if (alt < distances[edge.target]) {
+              distances[edge.target] = alt;
+              predecessors[edge.target] = minNode;
+            }
+          });
+        }
+
+        // Write results to nodes object for easy display rendering
+        nodes.forEach((n) => {
+          n.minCost = distances[n.id];
+          n.predecessor = predecessors[n.id];
+        });
+      }
+
+      // --- UI Rendering Engine ---
+      function updatePathsAndCosts() {
+        if (!isSimulating) {
+          computeStaticDijkstra();
+        }
+
+        if (needsDOMRebuild) {
+          rebuildGraphDOM();
+          needsDOMRebuild = false;
+        }
+
+        updateGraphVisuals();
+      }
+
+      function rebuildGraphDOM() {
+        // Draw Edges Structure
+        edgesGroup.innerHTML = "";
+        edges.forEach((edge) => {
+          // Create SVG path element
+          const path = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path",
+          );
+          path.setAttribute("id", `edge-${edge.id}`);
+          path.setAttribute(
+            "class",
+            "stroke-zinc-700 stroke-2 fill-none cursor-pointer hover:stroke-zinc-400 transition-colors",
+          );
+          path.setAttribute("marker-end", "url(#arrow)");
+          path.setAttribute("onclick", `onEdgeClick(event, '${edge.id}')`);
+
+          // Create edge weight label badge group
+          const group = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "g",
+          );
+          group.setAttribute("id", `edge-badge-group-${edge.id}`);
+          group.setAttribute("class", "cursor-pointer select-none");
+          group.setAttribute("onclick", `onEdgeClick(event, '${edge.id}')`);
+
+          const rect = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "rect",
+          );
+          rect.setAttribute("id", `edge-badge-rect-${edge.id}`);
+          rect.setAttribute("width", 20);
+          rect.setAttribute("height", 16);
+          rect.setAttribute("rx", 4);
+          rect.setAttribute("class", "fill-zinc-900 border border-zinc-800");
+
+          const text = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text",
+          );
+          text.setAttribute("id", `edge-badge-text-${edge.id}`);
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute(
+            "class",
+            "fill-zinc-300 font-mono font-bold text-[10px]",
+          );
+          text.textContent = edge.weight;
+
+          group.appendChild(rect);
+          group.appendChild(text);
+
+          edgesGroup.appendChild(path);
+          edgesGroup.appendChild(group);
+        });
+
+        // Draw Nodes Structure
+        nodesGroup.innerHTML = "";
+        nodes.forEach((node) => {
+          const group = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "g",
+          );
+          group.setAttribute("id", `node-${node.id}`);
+          group.setAttribute("class", "cursor-pointer select-none");
+          group.setAttribute(
+            "onmousedown",
+            `onNodeMouseDown(event, '${node.id}')`,
+          );
+
+          // Circle Background
+          const circle = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "circle",
+          );
+          circle.setAttribute("id", `circle-${node.id}`);
+          circle.setAttribute("r", 24);
+
+          // Node Label Name
+          const label = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text",
+          );
+          label.setAttribute("id", `node-label-${node.id}`);
+          label.setAttribute("y", 2);
+          label.setAttribute("text-anchor", "middle");
+          label.setAttribute("class", "fill-white text-xs font-semibold");
+          label.textContent = node.name || node.id;
+
+          // Node cumulative cost tag
+          const costTag = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "text",
+          );
+          costTag.setAttribute("id", `cost-label-${node.id}`);
+          costTag.setAttribute("y", -32);
+          costTag.setAttribute("text-anchor", "middle");
+          costTag.setAttribute(
+            "class",
+            "font-mono text-[10px] font-bold fill-zinc-400",
+          );
+
+          group.appendChild(circle);
+          group.appendChild(label);
+          group.appendChild(costTag);
+
+          nodesGroup.appendChild(group);
+        });
+      }
+
+      function updateGraphVisuals() {
+        let satisfactionMemo = {};
+        if (isBadgeMode) {
+          nodes.forEach((n) =>
+            evaluateBadgeSatisfaction(n.id, satisfactionMemo),
+          );
+        }
+
+        // Update Edges attributes
+        edges.forEach((edge) => {
+          const sourceNode = nodes.find((n) => n.id === edge.source);
+          const targetNode = nodes.find((n) => n.id === edge.target);
+          if (!sourceNode || !targetNode) return;
+
+          const hasReverse = edges.some(
+            (e) => e.source === edge.target && e.target === edge.source,
+          );
+
+          const x1 = sourceNode.x;
+          const y1 = sourceNode.y;
+          const x2 = targetNode.x;
+          const y2 = targetNode.y;
+
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          let pathData = "";
+          let labelCoords = { x: 0, y: 0 };
+          const nodeRadius = 24;
+
+          if (hasReverse && dist > 0) {
+            const nx = -dy / dist;
+            const ny = dx / dist;
+            const mx = (x1 + x2) / 2;
+            const my = (y1 + y2) / 2;
+            const offset = 25;
+            const cx = mx + offset * nx;
+            const cy = my + offset * ny;
+
+            const sDx = cx - x1;
+            const sDy = cy - y1;
+            const sDist = Math.sqrt(sDx * sDx + sDy * sDy);
+            const sx = x1 + (nodeRadius * sDx) / sDist;
+            const sy = y1 + (nodeRadius * sDy) / sDist;
+
+            const eDx = cx - x2;
+            const eDy = cy - y2;
+            const eDist = Math.sqrt(eDx * eDx + eDy * eDy);
+            const ex = x2 + ((nodeRadius + 2) * eDx) / eDist;
+            const ey = y2 + ((nodeRadius + 2) * eDy) / eDist;
+
+            pathData = `M ${sx} ${sy} Q ${cx} ${cy} ${ex} ${ey}`;
+            labelCoords.x = 0.25 * sx + 0.5 * cx + 0.25 * ex + 10 * nx;
+            labelCoords.y = 0.25 * sy + 0.5 * cy + 0.25 * ey + 10 * ny;
+          } else if (dist > 0) {
+            const sx = x1 + (nodeRadius * dx) / dist;
+            const sy = y1 + (nodeRadius * dy) / dist;
+            const ex = x2 - ((nodeRadius + 2) * dx) / dist;
+            const ey = y2 - ((nodeRadius + 2) * dy) / dist;
+
+            pathData = `M ${sx} ${sy} L ${ex} ${ey}`;
+            labelCoords.x = (sx + ex) / 2 - 10 * (-dy / dist);
+            labelCoords.y = (sy + ey) / 2 - 10 * (dx / dist);
+          }
+
+          const path = document.getElementById(`edge-${edge.id}`);
+          if (path) {
+            path.setAttribute("d", pathData);
+
+            // Adjust highlights / markers
+            if (selectedEdge && selectedEdge.id === edge.id) {
+              path.setAttribute("stroke", "#f59e0b");
+              path.setAttribute("marker-end", "url(#arrow-selected)");
+              path.setAttribute("stroke-dasharray", "");
+            } else if (isBadgeMode) {
+              // Custom rendering for Badge Mode
+              const isSourceSatisfied = satisfactionMemo[edge.source];
+              const isSourceFaded = sourceNode.status === "faded";
+
+              if (badgeRuleModel === "possession") {
+                // Old Model: needs parent to be SATISFIED and NOT faded (acquired)
+                const isSourceAcquired = isSourceSatisfied && !isSourceFaded;
+                if (isSourceAcquired) {
+                  path.setAttribute("stroke", "#10b981"); // emerald
+                  path.setAttribute("marker-end", "url(#arrow-shortest)");
+                  path.setAttribute("stroke-dasharray", "");
+                } else {
+                  path.setAttribute("stroke", "#ef4444"); // red block
+                  path.setAttribute("marker-end", "url(#arrow)");
+                  path.setAttribute("stroke-dasharray", "4");
+                }
+              } else {
+                // New Model: parent just needs to be SATISFIED historically
+                if (isSourceSatisfied) {
+                  path.setAttribute("stroke", "#10b981"); // emerald
+                  path.setAttribute("marker-end", "url(#arrow-shortest)");
+                  path.setAttribute("stroke-dasharray", "");
+                } else if (isSourceFaded) {
+                  path.setAttribute("stroke", "#f43f5e"); // faded unsatisfied (rose)
+                  path.setAttribute("marker-end", "url(#arrow)");
+                  path.setAttribute("stroke-dasharray", "4");
+                } else {
+                  path.setAttribute("stroke", "#3f3f46");
+                  path.setAttribute("marker-end", "url(#arrow)");
+                  path.setAttribute("stroke-dasharray", "");
+                }
+              }
+            } else {
+              path.setAttribute("stroke", "#3f3f46");
+              path.setAttribute("marker-end", "url(#arrow)");
+              path.setAttribute("stroke-dasharray", "");
+            }
+          }
+
+          const badgeRect = document.getElementById(
+            `edge-badge-rect-${edge.id}`,
+          );
+          const badgeText = document.getElementById(
+            `edge-badge-text-${edge.id}`,
+          );
+          if (badgeRect && badgeText) {
+            const textContent = isBadgeMode
+              ? `+${targetNode.requiredCheckins || 0}`
+              : edge.weight;
+
+            badgeText.textContent = textContent;
+
+            // Calculate dynamic width based on text length
+            const textLen = textContent.toString().length;
+            const badgeWidth = Math.max(20, textLen * 7 + 8);
+            badgeRect.setAttribute("width", badgeWidth);
+            badgeRect.setAttribute("x", labelCoords.x - badgeWidth / 2);
+            badgeRect.setAttribute("y", labelCoords.y - 8);
+            badgeText.setAttribute("x", labelCoords.x);
+            badgeText.setAttribute("y", labelCoords.y + 4);
+          }
+        });
+
+        // Update Nodes attributes
+        nodes.forEach((node) => {
+          const group = document.getElementById(`node-${node.id}`);
+          if (group) {
+            group.setAttribute("transform", `translate(${node.x}, ${node.y})`);
+          }
+
+          const circle = document.getElementById(`circle-${node.id}`);
+          if (circle) {
+            circle.style.filter = "";
+            if (isBadgeMode) {
+              const isSatisfied = satisfactionMemo[node.id];
+              const isFaded = node.status === "faded";
+              const isAcquired = isSatisfied && !isFaded;
+
+              if (selectedNode && selectedNode.id === node.id) {
+                circle.setAttribute(
+                  "class",
+                  "fill-zinc-900 stroke-indigo-400 stroke-[3px]",
+                );
+                circle.style.filter =
+                  "drop-shadow(0px 0px 8px rgba(99, 102, 241, 0.4))";
+              } else if (isAcquired) {
+                circle.setAttribute(
+                  "class",
+                  "fill-emerald-950/20 stroke-emerald-500 stroke-[3px]",
+                );
+                circle.style.filter =
+                  "drop-shadow(0px 0px 8px rgba(16, 185, 129, 0.4))";
+              } else if (isSatisfied && isFaded) {
+                circle.setAttribute(
+                  "class",
+                  "fill-zinc-900 stroke-emerald-500 stroke-[2px] stroke-dasharray-4",
+                );
+                circle.style.filter =
+                  "drop-shadow(0px 0px 6px rgba(16, 185, 129, 0.2))";
+              } else if (isFaded) {
+                circle.setAttribute(
+                  "class",
+                  "fill-zinc-900 stroke-rose-500 stroke-[2px] stroke-dasharray-4",
+                );
+              } else {
+                circle.setAttribute(
+                  "class",
+                  "fill-zinc-900 stroke-zinc-700 stroke-2 hover:stroke-zinc-500 transition",
+                );
+              }
+            } else {
+              if (node.isStart) {
+                circle.setAttribute(
+                  "class",
+                  "fill-zinc-900 stroke-emerald-500 stroke-[3px]",
+                );
+                circle.style.filter =
+                  "drop-shadow(0px 0px 8px rgba(16, 185, 129, 0.4))";
+              } else if (selectedNode && selectedNode.id === node.id) {
+                circle.setAttribute(
+                  "class",
+                  "fill-zinc-900 stroke-indigo-400 stroke-[3px]",
+                );
+                circle.style.filter =
+                  "drop-shadow(0px 0px 8px rgba(99, 102, 241, 0.4))";
+              } else {
+                circle.setAttribute(
+                  "class",
+                  "fill-zinc-900 stroke-zinc-700 stroke-2 hover:stroke-zinc-500 transition",
+                );
+              }
+            }
+          }
+
+          const label = document.getElementById(`node-label-${node.id}`);
+          if (label) {
+            label.textContent = node.name || node.id;
+          }
+
+          const costLabel = document.getElementById(`cost-label-${node.id}`);
+          if (costLabel) {
+            if (isBadgeMode) {
+              const isSatisfied = satisfactionMemo[node.id];
+              const isFaded = node.status === "faded";
+              const isAcquired = isSatisfied && !isFaded;
+
+              if (isAcquired) {
+                costLabel.textContent = "Earned";
+                costLabel.setAttribute(
+                  "class",
+                  "font-mono text-[10px] font-bold fill-emerald-400",
+                );
+              } else if (isSatisfied && isFaded) {
+                costLabel.textContent = "Satisfied (Faded)";
+                costLabel.setAttribute(
+                  "class",
+                  "font-mono text-[10px] font-bold fill-emerald-400",
+                );
+              } else if (isFaded) {
+                costLabel.textContent = "Faded (Locked)";
+                costLabel.setAttribute(
+                  "class",
+                  "font-mono text-[10px] font-bold fill-rose-400",
+                );
+              } else {
+                costLabel.textContent = "Locked";
+                costLabel.setAttribute(
+                  "class",
+                  "font-mono text-[10px] font-bold fill-zinc-500",
+                );
+              }
+            } else {
+              const showInfinity = document.getElementById(
+                "show-infinity-checkbox",
+              ).checked;
+              const cost =
+                node.minCost === Infinity
+                  ? showInfinity
+                    ? "∞"
+                    : ""
+                  : `Cost: ${node.minCost}`;
+              costLabel.textContent = cost;
+              costLabel.setAttribute(
+                "class",
+                "font-mono text-[10px] font-bold fill-zinc-400",
+              );
+            }
+          }
+        });
+
+        if (isBadgeMode) {
+          renderBadgePanel();
+        } else {
+          // Sync the algorithm simulator tables if not active
+          if (!isSimulating) {
+            renderAlgorithmStateTable();
+          }
+        }
+      }
+
+      function highlightShortestPathToNode(node) {
+        // Turn off highlight first
+        updatePathsAndCosts();
+
+        let current = node;
+        while (current && current.predecessor) {
+          const parentId = current.predecessor;
+          const edgeId = `${parentId}-${current.id}`;
+
+          // Highlight edge
+          const pathEl = document.getElementById(`edge-${edgeId}`);
+          if (pathEl) {
+            pathEl.setAttribute("stroke", "#6366f1");
+            pathEl.setAttribute("stroke-width", "4px");
+            pathEl.setAttribute("marker-end", "url(#arrow-shortest)");
+          }
+
+          current = nodes.find((n) => n.id === parentId);
+        }
+      }
+
+      // --- Step-By-Step Simulation Engine ---
+      function runSimulationDijkstra() {
+        if (!startNodeId || nodes.length === 0) return;
+
+        simSteps = [];
+        simCurrentIndex = -1;
+
+        // Deep clone starting configurations
+        let currentDistances = {};
+        let currentPredecessors = {};
+        let currentVisited = new Set();
+        let currentQueue = []; // Priority queue: array of {id, dist}
+
+        nodes.forEach((n) => {
+          currentDistances[n.id] = Infinity;
+          currentPredecessors[n.id] = null;
+        });
+        const startNode = nodes.find((n) => n.id === startNodeId);
+        const startDist =
+          isBadgeMode && startNode ? startNode.requiredCheckins || 0 : 0;
+        currentDistances[startNodeId] = startDist;
+        currentQueue.push({ id: startNodeId, dist: startDist });
+
+        // Step 0: Initial state
+        simSteps.push({
+          description: `Initialize Dijkstra: Set start node <strong>${startNodeId}</strong> distance to ${startDist}, and all other nodes to Infinity.`,
+          distances: { ...currentDistances },
+          predecessors: { ...currentPredecessors },
+          visited: new Set(currentVisited),
+          queue: [...currentQueue],
+          activeNode: null,
+          evaluatingEdge: null,
+        });
+
+        while (currentQueue.length > 0) {
+          // Step 1: Pick Minimum Node
+          currentQueue.sort((a, b) => a.dist - b.dist);
+          const nextItem = currentQueue.shift();
+          const u = nextItem.id;
+
+          // If we pop an infinity node, we stop
+          if (currentDistances[u] === Infinity) break;
+
+          // Skip if already visited
+          if (currentVisited.has(u)) continue;
+
+          // Step: Mark active node
+          simSteps.push({
+            description: `Extract node with minimum tentative cost: <strong>${u}</strong> (Cost: ${currentDistances[u]}).`,
+            distances: { ...currentDistances },
+            predecessors: { ...currentPredecessors },
+            visited: new Set(currentVisited),
+            queue: [...currentQueue],
+            activeNode: u,
+            evaluatingEdge: null,
+          });
+
+          // Get outgoing neighbors
+          const neighbors = edges.filter((e) => e.source === u);
+
+          for (let edge of neighbors) {
+            const v = edge.target;
+
+            if (currentVisited.has(v)) {
+              simSteps.push({
+                description: `Check outgoing edge <strong>${u} → ${v}</strong>. Neighbor <strong>${v}</strong> is already visited, skip.`,
+                distances: { ...currentDistances },
+                predecessors: { ...currentPredecessors },
+                visited: new Set(currentVisited),
+                queue: [...currentQueue],
+                activeNode: u,
+                evaluatingEdge: edge.id,
+              });
+              continue;
+            }
+
+            const weight = getEdgeWeight(edge);
+            const tentative = currentDistances[u] + weight;
+            const pathBetter = tentative < currentDistances[v];
+
+            if (pathBetter) {
+              currentDistances[v] = tentative;
+              currentPredecessors[v] = u;
+              currentQueue.push({ id: v, dist: tentative });
+            }
+
+            simSteps.push({
+              description:
+                `Relax edge <strong>${u} → ${v}</strong>: Tentative cost is ${currentDistances[u]} + ${weight} = ${tentative}. ` +
+                (pathBetter
+                  ? `Shorter path found! Update <strong>${v}</strong> distance to ${tentative}.`
+                  : `Existing distance (${currentDistances[v]}) is better. No change.`),
+              distances: { ...currentDistances },
+              predecessors: { ...currentPredecessors },
+              visited: new Set(currentVisited),
+              queue: [...currentQueue],
+              activeNode: u,
+              evaluatingEdge: edge.id,
+            });
+          }
+
+          currentVisited.add(u);
+          simSteps.push({
+            description: `Completed processing neighbors. Mark node <strong>${u}</strong> as <strong>Visited</strong>.`,
+            distances: { ...currentDistances },
+            predecessors: { ...currentPredecessors },
+            visited: new Set(currentVisited),
+            queue: [...currentQueue],
+            activeNode: u,
+            evaluatingEdge: null,
+          });
+        }
+
+        // Final step: Completion log
+        simSteps.push({
+          description: `Dijkstra algorithm has completed executing successfully. All reachable nodes resolved.`,
+          distances: { ...currentDistances },
+          predecessors: { ...currentPredecessors },
+          visited: new Set(currentVisited),
+          queue: [],
+          activeNode: null,
+          evaluatingEdge: null,
+        });
+      }
+
+      function renderSimStep(index) {
+        if (index < 0 || index >= simSteps.length) return;
+
+        const step = simSteps[index];
+        isSimulating = true;
+
+        // Update Log
+        document.getElementById("sim-log").innerHTML = step.description;
+        document.getElementById("sim-step-count").innerText =
+          `${index + 1} / ${simSteps.length}`;
+
+        // Sync visual representation to graph view
+        nodes.forEach((node) => {
+          node.minCost = step.distances[node.id];
+          node.predecessor = step.predecessors[node.id];
+
+          const circleEl = document.getElementById(`circle-${node.id}`);
+          if (circleEl) {
+            circleEl.style.filter = "";
+            if (step.activeNode === node.id) {
+              circleEl.setAttribute(
+                "class",
+                "fill-zinc-900 stroke-amber-500 stroke-[3px] animate-pulse",
+              );
+              circleEl.style.filter =
+                "drop-shadow(0px 0px 8px rgba(245, 158, 11, 0.6))";
+            } else if (step.visited.has(node.id)) {
+              circleEl.setAttribute(
+                "class",
+                "fill-indigo-950/30 stroke-emerald-500 stroke-2",
+              );
+            } else if (node.id === startNodeId) {
+              circleEl.setAttribute(
+                "class",
+                "fill-zinc-900 stroke-emerald-500 stroke-[3px]",
+              );
+            } else {
+              circleEl.setAttribute(
+                "class",
+                "fill-zinc-900 stroke-zinc-700 stroke-2",
+              );
+            }
+          }
+        });
+
+        // Update edge colors
+        edges.forEach((edge) => {
+          const pathEl = document.getElementById(`edge-${edge.id}`);
+          if (pathEl) {
+            if (step.evaluatingEdge === edge.id) {
+              pathEl.setAttribute("stroke", "#f59e0b");
+              pathEl.setAttribute("stroke-width", "3px");
+              pathEl.setAttribute("marker-end", "url(#arrow-active)");
+            } else {
+              // Check if part of the predecessor tree
+              const targetNodeId = edge.target;
+              const sourceNodeId = edge.source;
+              if (
+                step.predecessors[targetNodeId] === sourceNodeId &&
+                step.distances[targetNodeId] !== Infinity
+              ) {
+                pathEl.setAttribute("stroke", "#6366f1");
+                pathEl.setAttribute("stroke-width", "2.5px");
+                pathEl.setAttribute("marker-end", "url(#arrow-shortest)");
+              } else {
+                pathEl.setAttribute("stroke", "#3f3f46");
+                pathEl.setAttribute("stroke-width", "2px");
+                pathEl.setAttribute("marker-end", "url(#arrow)");
+              }
+            }
+          }
+        });
+
+        // Update custom costs text
+        nodes.forEach((node) => {
+          const textNodes = document.querySelectorAll(`#node-${node.id} text`);
+          if (textNodes.length >= 2) {
+            const showInfinity = document.getElementById(
+              "show-infinity-checkbox",
+            ).checked;
+            const cost =
+              node.minCost === Infinity
+                ? showInfinity
+                  ? "∞"
+                  : ""
+                : `Cost: ${node.minCost}`;
+            textNodes[1].textContent = cost;
+          }
+        });
+
+        // Sync Tables UI
+        renderAlgorithmStateTable(
+          step.distances,
+          step.predecessors,
+          step.visited,
+          step.activeNode,
+        );
+        renderPriorityQueueTable(step.queue);
+
+        // Enable/disable buttons
+        document.getElementById("sim-prev-btn").disabled = index <= 0;
+        document.getElementById("sim-next-btn").disabled =
+          index >= simSteps.length - 1;
+
+        if (index >= simSteps.length - 1) {
+          pauseSimulation();
+          document.getElementById("sim-status").innerText = "Completed";
+          document.getElementById("sim-status").className =
+            "text-xs bg-emerald-950 text-emerald-400 border border-emerald-900 px-2 py-0.5 rounded uppercase tracking-wider font-semibold";
+        }
+      }
+
+      function renderAlgorithmStateTable(
+        distances = null,
+        predecessors = null,
+        visited = null,
+        active = null,
+      ) {
+        const tbody = document.getElementById("state-table-body");
+        tbody.innerHTML = "";
+
+        nodes.forEach((node) => {
+          let cost = "-";
+          let pred = "-";
+          let status = "Unvisited";
+          let statusClass = "text-zinc-500";
+
+          if (distances) {
+            cost = distances[node.id] === Infinity ? "∞" : distances[node.id];
+            pred = predecessors[node.id] || "-";
+
+            if (node.id === active) {
+              status = "Evaluating";
+              statusClass = "text-amber-400 font-bold";
+            } else if (visited.has(node.id)) {
+              status = "Visited";
+              statusClass = "text-emerald-400 font-medium";
+            }
+          } else {
+            cost =
+              node.minCost === Infinity
+                ? "∞"
+                : node.minCost !== undefined
+                  ? node.minCost
+                  : "-";
+            pred = node.predecessor || "-";
+            if (node.isStart) {
+              status = "Start Node";
+              statusClass = "text-emerald-400 font-bold";
+            }
+          }
+
+          const tr = document.createElement("tr");
+          tr.setAttribute(
+            "class",
+            "border-b border-zinc-900 hover:bg-zinc-900/30 transition",
+          );
+          if (node.id === active) {
+            tr.classList.add("bg-amber-950/20");
+          }
+          tr.innerHTML = `
+                    <td class="px-3 py-2 font-semibold text-zinc-200">${node.name || node.id}</td>
+                    <td class="px-3 py-2 font-mono">${cost}</td>
+                    <td class="px-3 py-2 font-mono">${pred}</td>
+                    <td class="px-3 py-2 text-right ${statusClass}">${status}</td>
+                `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderPriorityQueueTable(queue) {
+        const tbody = document.getElementById("frontier-table-body");
+        const countEl = document.getElementById("frontier-count");
+
+        tbody.innerHTML = "";
+
+        if (!queue || queue.length === 0) {
+          countEl.innerText = "Empty";
+          tbody.innerHTML = `
+                    <tr>
+                        <td colspan="2" class="px-3 py-4 text-center text-zinc-600">Queue is currently empty</td>
+                    </tr>
+                `;
+          return;
+        }
+
+        countEl.innerText = `${queue.length} elements`;
+
+        // Sort queue copy by distance for priority order
+        const sortedQueue = [...queue].sort((a, b) => a.dist - b.dist);
+
+        sortedQueue.forEach((item) => {
+          const nodeName = nodes.find((n) => n.id === item.id)?.name || item.id;
+          const tr = document.createElement("tr");
+          tr.setAttribute("class", "border-b border-zinc-900 font-mono");
+          tr.innerHTML = `
+                    <td class="px-3 py-1.5 font-sans font-semibold text-zinc-300">${nodeName}</td>
+                    <td class="px-3 py-1.5 text-right text-indigo-400 font-bold">${item.dist === Infinity ? "∞" : item.dist}</td>
+                `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      // --- Simulator Interactivity Actions ---
+      function togglePlaySimulation() {
+        if (simSteps.length === 0) {
+          runSimulationDijkstra();
+        }
+
+        if (isSimulating && simIntervalId) {
+          pauseSimulation();
+        } else {
+          playSimulation();
+        }
+      }
+
+      function playSimulation() {
+        isSimulating = true;
+        document.getElementById("sim-status").innerText = "Running";
+        document.getElementById("sim-status").className =
+          "text-xs bg-indigo-950 text-indigo-400 border border-indigo-900 px-2 py-0.5 rounded uppercase tracking-wider font-semibold";
+
+        document.getElementById("sim-play-icon").className =
+          "fa-solid fa-pause";
+        document.getElementById("sim-play-text").innerText = "Pause";
+
+        if (simCurrentIndex >= simSteps.length - 1) {
+          simCurrentIndex = -1;
+        }
+
+        // Trigger immediately first
+        stepForward();
+
+        simIntervalId = setInterval(() => {
+          if (simCurrentIndex < simSteps.length - 1) {
+            stepForward();
+          } else {
+            pauseSimulation();
+          }
+        }, simSpeed);
+      }
+
+      function pauseSimulation() {
+        if (simIntervalId) {
+          clearInterval(simIntervalId);
+          simIntervalId = null;
+        }
+        document.getElementById("sim-status").innerText = "Paused";
+        document.getElementById("sim-status").className =
+          "text-xs bg-amber-950/70 text-amber-400 border border-amber-900/50 px-2 py-0.5 rounded uppercase tracking-wider font-semibold";
+
+        document.getElementById("sim-play-icon").className = "fa-solid fa-play";
+        document.getElementById("sim-play-text").innerText = "Play";
+      }
+
+      function resetSimulation() {
+        pauseSimulation();
+        simSteps = [];
+        simCurrentIndex = -1;
+        isSimulating = false;
+
+        document.getElementById("sim-status").innerText = "Idle";
+        document.getElementById("sim-status").className =
+          "text-xs bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded uppercase tracking-wider font-semibold";
+        document.getElementById("sim-step-count").innerText = "0 / 0";
+        document.getElementById("sim-log").innerHTML =
+          "Click <strong>Play</strong> or <strong>Next</strong> to start tracing path calculation.";
+        document.getElementById("sim-prev-btn").disabled = true;
+        document.getElementById("sim-next-btn").disabled = false;
+
+        const tbody = document.getElementById("frontier-table-body");
+        tbody.innerHTML = `
+                <tr>
+                    <td colspan="2" class="px-3 py-4 text-center text-zinc-600">Queue is currently empty</td>
+                </tr>
+            `;
+        document.getElementById("frontier-count").innerText = "Empty";
+
+        updatePathsAndCosts();
+      }
+
+      function stepForward() {
+        if (simSteps.length === 0) {
+          runSimulationDijkstra();
+        }
+
+        if (simCurrentIndex < simSteps.length - 1) {
+          simCurrentIndex++;
+          renderSimStep(simCurrentIndex);
+        }
+      }
+
+      function stepBackward() {
+        if (simCurrentIndex > 0) {
+          simCurrentIndex--;
+          renderSimStep(simCurrentIndex);
+        }
+      }
+
+      function updateSimSpeed(val) {
+        simSpeed = parseInt(val, 10);
+        document.getElementById("sim-speed-val").innerText = `${simSpeed}ms`;
+
+        if (isSimulating && simIntervalId) {
+          clearInterval(simIntervalId);
+          simIntervalId = setInterval(() => {
+            if (simCurrentIndex < simSteps.length - 1) {
+              stepForward();
+            } else {
+              pauseSimulation();
+            }
+          }, simSpeed);
+        }
+      }
+
+      // --- JSON Import/Export Utilities ---
+      function exportGraphJSON() {
+        const dataStr =
+          "data:text/json;charset=utf-8," +
+          encodeURIComponent(
+            JSON.stringify(
+              {
+                nodes: nodes.map((n) => ({
+                  id: n.id,
+                  name: n.name,
+                  x: n.x,
+                  y: n.y,
+                  isStart: n.isStart,
+                })),
+                edges: edges.map((e) => ({
+                  id: e.id,
+                  source: e.source,
+                  target: e.target,
+                  weight: e.weight,
+                })),
+              },
+              null,
+              2,
+            ),
+          );
+        const dlAnchorElem = document.createElement("a");
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute(
+          "download",
+          `directed-graph-${new Date().toISOString().slice(0, 10)}.json`,
+        );
+        dlAnchorElem.click();
+      }
+
+      function importGraphJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (data.nodes && data.edges) {
+              resetSimulation();
+              nodes = data.nodes;
+              edges = data.edges;
+
+              // Validate start node
+              const start = nodes.find((n) => n.isStart);
+              startNodeId = start
+                ? start.id
+                : nodes.length > 0
+                  ? nodes[0].id
+                  : null;
+              if (nodes.length > 0 && !start) {
+                nodes[0].isStart = true;
+                startNodeId = nodes[0].id;
+              }
+
+              selectNode(null);
+              selectEdge(null);
+              needsDOMRebuild = true;
+              updatePathsAndCosts();
+            } else {
+              alert(
+                "Invalid file format. Must contain 'nodes' and 'edges' lists.",
+              );
+            }
+          } catch (err) {
+            alert("Error parsing JSON file.");
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      // --- Badge Simulator Logic & Controls ---
+      function toggleBadgeRuleModel(val) {
+        badgeRuleModel = val;
+        updatePathsAndCosts();
+      }
+
+      function incrementBadgeCheckin(area) {
+        if (badgeCheckins[area] === undefined) {
+          badgeCheckins[area] = 0;
+        }
+        badgeCheckins[area]++;
+        updatePathsAndCosts();
+      }
+
+      function decrementBadgeCheckin(area) {
+        if (badgeCheckins[area] && badgeCheckins[area] > 0) {
+          badgeCheckins[area]--;
+          updatePathsAndCosts();
+        }
+      }
+
+      function resetBadgeCheckins() {
+        // Collect all unique areaId values currently in nodes
+        const areas = new Set();
+        nodes.forEach((n) => {
+          if (n.areaId) areas.add(n.areaId);
+        });
+
+        // Initialize checkins
+        badgeCheckins = {};
+        areas.forEach((area) => {
+          badgeCheckins[area] = 0;
+        });
+
+        // Default areas just in case
+        ["Cualquiera", "Zone A", "Zone B", "Zone C", "Zone D"].forEach(
+          (area) => {
+            if (badgeCheckins[area] === undefined) badgeCheckins[area] = 0;
+          },
+        );
+
+        updatePathsAndCosts();
+      }
+
+      function evaluateBadgeSatisfaction(nodeId, memo = {}) {
+        if (memo[nodeId] !== undefined) return memo[nodeId];
+
+        const node = nodes.find((n) => n.id === nodeId);
+        if (!node) return false;
+
+        // 1. Check incoming prerequisite connections
+        const incoming = edges.filter((e) => e.target === nodeId);
+        let prereqsOk = true;
+
+        for (let edge of incoming) {
+          const parentSatisfied = evaluateBadgeSatisfaction(edge.source, memo);
+          if (badgeRuleModel === "possession") {
+            // Old Model: parent must be satisfied AND active (not faded) to be acquired
+            const parentNode = nodes.find((n) => n.id === edge.source);
+            const parentAcquired =
+              parentSatisfied && parentNode.status !== "faded";
+            if (!parentAcquired) {
+              prereqsOk = false;
+              break;
+            }
+          } else {
+            // New Model: parent just has to be historically satisfied
+            if (!parentSatisfied) {
+              prereqsOk = false;
+              break;
+            }
+          }
+        }
+
+        // 2. Check current node check-ins
+        const currentCheckins = badgeCheckins[node.areaId || "Area 1"] || 0;
+        const required = node.requiredCheckins || 1;
+        const selfOk = currentCheckins >= required;
+
+        const isSatisfied = prereqsOk && selfOk;
+        memo[nodeId] = isSatisfied;
+        return isSatisfied;
+      }
+
+      function renderBadgePanel() {
+        // 1. Render Checkins Manager counters
+        const checkinsContainer = document.getElementById(
+          "badge-checkins-manager",
+        );
+        if (checkinsContainer) {
+          // Find all unique areaIds in current graph nodes, sort them
+          const areas = Array.from(
+            new Set(nodes.map((n) => n.areaId || "Area 1")),
+          ).sort();
+          if (areas.length === 0) areas.push("Area 1");
+
+          checkinsContainer.innerHTML = areas
+            .map((area) => {
+              const count = badgeCheckins[area] || 0;
+              return `
+              <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-2 flex flex-col items-center justify-between">
+                <span class="text-[10px] text-zinc-500 font-bold mb-1 truncate w-full text-center">${area}</span>
+                <div class="flex items-center gap-2">
+                  <button onclick="decrementBadgeCheckin('${area}')" class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center font-bold text-xs">-</button>
+                  <span class="font-mono text-sm font-bold text-white">${count}</span>
+                  <button onclick="incrementBadgeCheckin('${area}')" class="w-6 h-6 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 flex items-center justify-center font-bold text-xs">+</button>
+                </div>
+              </div>
+            `;
+            })
+            .join("");
+        }
+
+        // 2. Calculate satisfaction/acquisition states
+        const satisfactionMemo = {};
+        nodes.forEach((node) => {
+          evaluateBadgeSatisfaction(node.id, satisfactionMemo);
+        });
+
+        // 3. Render Status Table
+        const statusTableBody = document.getElementById(
+          "badge-status-table-body",
+        );
+        if (statusTableBody) {
+          statusTableBody.innerHTML = nodes
+            .map((node) => {
+              const isSatisfied = satisfactionMemo[node.id];
+              const isAcquired = isSatisfied && node.status !== "faded";
+
+              const satBadge = isSatisfied
+                ? `<span class="inline-flex items-center gap-1 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full"><i class="fa-solid fa-circle-check"></i> Yes</span>`
+                : `<span class="inline-flex items-center gap-1 text-[10px] bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full">No</span>`;
+
+              const acqBadge = isAcquired
+                ? `<span class="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold"><i class="fa-solid fa-award text-emerald-400"></i> Earned</span>`
+                : node.status === "faded" && isSatisfied
+                  ? `<span class="inline-flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded" title="Faded prerequisite satisfied historically, but badge itself is faded and cannot be unlocked."><i class="fa-solid fa-ghost"></i> Faded (Bypassed)</span>`
+                  : `<span class="inline-flex items-center gap-1 text-[10px] bg-zinc-900 border border-zinc-800 text-zinc-600 px-2 py-0.5 rounded">Locked</span>`;
+
+              const statusLabel =
+                node.status === "faded"
+                  ? `<span class="text-[10px] font-bold text-rose-400 border border-rose-900/30 bg-rose-950/20 px-1.5 py-0.5 rounded">FADED</span>`
+                  : `<span class="text-[10px] font-bold text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded">ACTIVE</span>`;
+
+              return `
+              <tr class="border-b border-zinc-900 hover:bg-zinc-900/30 transition">
+                <td class="px-3 py-2 font-semibold text-zinc-200">
+                  <div class="flex flex-col">
+                    <span>${node.name || node.id}</span>
+                    <span class="text-[9px] text-zinc-500">Requires ${node.requiredCheckins || 1} in ${node.areaId || "Area 1"}</span>
+                  </div>
+                </td>
+                <td class="px-3 py-2">${statusLabel}</td>
+                <td class="px-3 py-2 text-center">${satBadge}</td>
+                <td class="px-3 py-2 text-right">${acqBadge}</td>
+              </tr>
+            `;
+            })
+            .join("");
+        }
+
+        // 4. Update Badge Emulation Log message
+        const logEl = document.getElementById("badge-sim-log");
+        if (logEl) {
+          const fadedNode = nodes.find((n) => n.status === "faded");
+          const fadedName = fadedNode ? fadedNode.name : "faded badge";
+          const downstreamNode = nodes.find((n) => {
+            if (n.status === "faded") return false;
+            // Check if it has an incoming edge from fadedNode
+            return (
+              fadedNode &&
+              edges.some((e) => e.source === fadedNode.id && e.target === n.id)
+            );
+          });
+          const downstreamName = downstreamNode
+            ? downstreamNode.name
+            : "downstream badges";
+
+          if (badgeRuleModel === "possession") {
+            logEl.innerHTML = `
+              <strong>Old Model (Possession) is active</strong>.<br/>
+              Because <strong>${fadedName}</strong> is faded, new users cannot acquire it. 
+              As a result, the prerequisite check for <strong>${downstreamName}</strong> fails, leaving it and all subsequent badges permanently locked (Cost: <strong>∞</strong>).
+            `;
+          } else {
+            // satisfaction
+            const isFadedSatisfied = fadedNode
+              ? satisfactionMemo[fadedNode.id]
+              : false;
+            const isDownstreamSatisfied = downstreamNode
+              ? satisfactionMemo[downstreamNode.id]
+              : false;
+
+            if (isDownstreamSatisfied) {
+              logEl.innerHTML = `
+                <strong>New Model (Satisfaction) is active</strong>.<br/>
+                <span class="text-emerald-400 font-semibold">Success!</span> The user checked in to all required areas. 
+                Even though <strong>${fadedName}</strong> is faded and cannot be earned, its prerequisite was satisfied historically, successfully unlocking <strong>${downstreamName}</strong>!
+              `;
+            } else if (isFadedSatisfied) {
+              logEl.innerHTML = `
+                <strong>New Model (Satisfaction) is active</strong>.<br/>
+                The prerequisite requirements for <strong>${fadedName}</strong> are satisfied, so the path is open. 
+                Perform check-ins for <strong>${downstreamName}</strong>'s area to unlock it!
+              `;
+            } else {
+              logEl.innerHTML = `
+                <strong>New Model (Satisfaction) is active</strong>.<br/>
+                Prerequisites are evaluated historically. Try checking in to Area 1 (unlocks Badge X) and Area 2 to satisfy <strong>${fadedName}</strong>, opening the path to downstream targets.
+              `;
+            }
+          }
+        }
+      }
+
+      function editNodeStatus() {
+        if (!selectedNode) return;
+        const status = document.getElementById("node-status-select").value;
+        selectedNode.status = status;
+        updatePathsAndCosts();
+      }
+
+      function editNodeArea() {
+        if (!selectedNode) return;
+        const area = document.getElementById("node-area-select").value;
+        selectedNode.areaId = area;
+        updatePathsAndCosts();
+      }
+
+      function editNodeReqCheckins(val) {
+        if (!selectedNode) return;
+        const count = parseInt(val, 10);
+        const validCount = isNaN(count) ? 0 : count;
+        selectedNode.requiredCheckins = Math.max(0, validCount);
+        document.getElementById("node-req-checkins-display").innerText =
+          selectedNode.requiredCheckins;
+        updatePathsAndCosts();
+      }
+    </script>
+  </body>
+</html>

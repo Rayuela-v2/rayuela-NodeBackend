@@ -8,6 +8,12 @@ export enum UserRole {
   Volunteer = 'Volunteer',
 }
 
+/** One signed-in device: the SHA-256 of its refresh token + its expiry. */
+export interface RefreshSession {
+  hash: string;
+  expiry: Date;
+}
+
 export class Rating {
   @Prop({
     required: true,
@@ -49,7 +55,10 @@ export class UserTemplate {
   createdAt: Date;
 
   @Prop({ default: null })
-  profile_image: string; // Imagen de perfil (puede ser una URL)
+  profile_image: string; // Imagen de perfil (URL, o un id de avatar `avatar:<id>`)
+
+  @Prop({ default: '' })
+  description: string; // Bio corta que el usuario edita desde su perfil
 
   @Prop({ default: false })
   verified: boolean; // Indica si el usuario ha verificado su cuenta
@@ -61,10 +70,19 @@ export class UserTemplate {
   gameProfiles: GameProfile[];
 
   @Prop({ default: null })
-  refreshTokenHash: string; // bcrypt hash of the refresh token
+  refreshTokenHash: string; // legacy single-session field, migrated on first refresh
 
   @Prop({ type: Date, default: null })
-  refreshTokenExpiry: Date; // when the refresh token expires
+  refreshTokenExpiry: Date; // legacy single-session field
+
+  /**
+   * One entry per signed-in device. Written only through the atomic
+   * `$push` / `$set` / `$pull` helpers in UserDao — never through
+   * `UserMapper.toTemplate`, so a concurrent profile update can't clobber
+   * someone else's session.
+   */
+  @Prop({ type: [{ hash: String, expiry: Date, _id: false }], default: [] })
+  refreshTokens?: RefreshSession[];
 
   @Prop({ type: Array, default: [] })
   contributions: string[]; // tasks id

@@ -1,4 +1,4 @@
-import { UserService } from './user.service';
+import { PROFILE_LIMITS, UserService } from './user.service';
 import { UserDao } from './user.dao';
 import { User } from './user.entity';
 import { Checkin } from '../../checkin/entities/checkin.entity';
@@ -95,6 +95,55 @@ describe('UserService', () => {
     await expect(service.rate('1', {} as Checkin, 5)).rejects.toThrow(
       'User not found',
     );
+  });
+
+  describe('updateProfile', () => {
+    const makeUser = () =>
+      new User('Nombre Viejo', 'user', 'a@b.com', 'hash', 'avatar:explorador');
+
+    it('solo pisa los campos presentes en el patch', async () => {
+      const user = makeUser();
+      user.description = 'bio vieja';
+      userDao.findByEmailOrUsername.mockResolvedValue(user);
+      userDao.update.mockImplementation(async (_id, u) => u);
+
+      await service.updateProfile('user', { complete_name: '  Ana Paz  ' });
+
+      expect(user.completeName).toBe('Ana Paz');
+      expect(user.description).toBe('bio vieja');
+      expect(user.profileImage).toBe('avatar:explorador');
+    });
+
+    it('recorta la descripción al límite e ignora un nombre vacío', async () => {
+      const user = makeUser();
+      userDao.findByEmailOrUsername.mockResolvedValue(user);
+      userDao.update.mockImplementation(async (_id, u) => u);
+
+      await service.updateProfile('user', {
+        complete_name: '   ',
+        description: 'x'.repeat(PROFILE_LIMITS.description + 50),
+      });
+
+      expect(user.completeName).toBe('Nombre Viejo');
+      expect(user.description).toHaveLength(PROFILE_LIMITS.description);
+    });
+
+    it('un profile_image vacío limpia el avatar', async () => {
+      const user = makeUser();
+      userDao.findByEmailOrUsername.mockResolvedValue(user);
+      userDao.update.mockImplementation(async (_id, u) => u);
+
+      await service.updateProfile('user', { profile_image: '' });
+
+      expect(user.profileImage).toBeNull();
+    });
+
+    it('falla si el usuario no existe', async () => {
+      userDao.findByEmailOrUsername.mockResolvedValue(null);
+      await expect(service.updateProfile('user', {})).rejects.toThrow(
+        'User not found',
+      );
+    });
   });
 
   it('getUserByResetToken debe delegar en userDao', () => {

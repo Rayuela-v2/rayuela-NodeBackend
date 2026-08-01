@@ -217,12 +217,21 @@ describe('AuthController', () => {
   });
 
   describe('logout', () => {
-    it('should logout successfully', async () => {
+    it('should logout only the calling device', async () => {
       const req = { user: { userId: 'user-id' } };
-      const result = await controller.logout(req);
+      const result = await controller.logout(req, {
+        refreshToken: 'user-id.secret',
+      });
 
       expect(result).toEqual({ message: 'Logged out successfully' });
-      expect(service.logout).toHaveBeenCalledWith('user-id');
+      expect(service.logout).toHaveBeenCalledWith('user-id', 'user-id.secret');
+    });
+
+    it('should logout every device when no refresh token is sent', async () => {
+      const req = { user: { userId: 'user-id' } };
+      await controller.logout(req, {});
+
+      expect(service.logout).toHaveBeenCalledWith('user-id', undefined);
     });
   });
 });

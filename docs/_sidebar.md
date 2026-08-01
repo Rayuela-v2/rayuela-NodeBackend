@@ -2,7 +2,7 @@
 - [Deployment & Infrastructure](deployment.md)
 - [Analytics Data Extraction](analytics-queries.md)
 - [Gamification & Badges Architecture](gamification-badges.md)
-
+- <a href="directed_graph_tool.html" target="_blank">Badge Graph Drawing Tool</a>
 
 - **Mobile Application**
   - [Architecture Overview](mobile/README.md)

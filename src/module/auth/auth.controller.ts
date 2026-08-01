@@ -144,8 +144,10 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
-  async logout(@Req() req) {
-    await this.authService.logout(req.user.userId);
+  async logout(@Req() req, @Body() body: { refreshToken?: string }) {
+    // Only this device's session is dropped when the client sends its
+    // refresh token; other devices stay signed in.
+    await this.authService.logout(req.user.userId, body?.refreshToken);
     return { message: 'Logged out successfully' };
   }
 }

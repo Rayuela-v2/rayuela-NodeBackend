@@ -49,6 +49,98 @@ export class UserDao {
     return updatedUser ? UserMapper.toEntity(updatedUser['_doc']) : null;
   }
 
+  // -------------------------------------------------------------------
+  // Refresh sessions
+  //
+  // These bypass the User entity / UserMapper on purpose: they are the
+  // only writers of `refreshTokens`, and they use atomic array operators
+  // so two devices refreshing at the same moment can't overwrite each
+  // other with a stale read-modify-write.
+  // -------------------------------------------------------------------
+
+  /** Adds a session, evicting the oldest once `max` is exceeded. */
+  async addRefreshSession(
+    userId: string,
+    hash: string,
+    expiry: Date,
+    max: number,
+  ): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          $push: {
+            refreshTokens: { $each: [{ hash, expiry }], $slice: -max },
+          },
+        },
+      )
+      .exec();
+  }
+
+  /**
+   * Slides a live session's expiry forward. Returns false only when the
+   * hash matches no live session — the single condition that means "this
+   * refresh token is dead, sign this device out".
+   *
+   * Falls back to the pre-multi-session `refreshTokenHash` field and
+   * migrates it in place, so deploying this change doesn't log out every
+   * user who is currently signed in.
+   */
+  async touchRefreshSession(
+    userId: string,
+    hash: string,
+    expiry: Date,
+    max: number,
+  ): Promise<boolean> {
+    const now = new Date();
+    const live = await this.userModel
+      .updateOne(
+        {
+          _id: userId,
+          refreshTokens: { $elemMatch: { hash, expiry: { $gt: now } } },
+        },
+        { $set: { 'refreshTokens.$.expiry': expiry } },
+      )
+      .exec();
+    if (live.matchedCount === 1) return true;
+
+    const legacy = await this.userModel
+      .updateOne(
+        { _id: userId, refreshTokenHash: hash, refreshTokenExpiry: { $gt: now } },
+        {
+          $set: { refreshTokenHash: null, refreshTokenExpiry: null },
+          $push: {
+            refreshTokens: { $each: [{ hash, expiry }], $slice: -max },
+          },
+        },
+      )
+      .exec();
+    return legacy.matchedCount === 1;
+  }
+
+  /** Signs one device out. Other sessions are untouched. */
+  async removeRefreshSession(userId: string, hash: string): Promise<void> {
+    await this.userModel
+      .updateOne({ _id: userId }, { $pull: { refreshTokens: { hash } } })
+      .exec();
+  }
+
+  /** Signs every device out (password reset, account recovery). */
+  async clearRefreshSessions(userId: string): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          $set: {
+            refreshTokens: [],
+            refreshTokenHash: null,
+            refreshTokenExpiry: null,
+          },
+        },
+      )
+      .exec();
+  }
+
   async getAllByProjectId(projectId: string): Promise<User[]> {
     const userDocuments = await this.userModel
       .find({

@@ -16,9 +16,15 @@ import * as process from 'node:process';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
+  MAX_REFRESH_SESSIONS,
   REFRESH_TOKEN_SEPARATOR,
   REFRESH_TOKEN_TTL_DAYS,
 } from './auth.constants';
+
+/** Sliding expiry: TTL counted from now, refreshed on every use. */
+function refreshExpiry(): Date {
+  return new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+}
 
 export interface UserJWT {
   userId: string;
@@ -248,17 +254,17 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload);
 
-    // Generate and persist a refresh token. The userId is prefixed onto the
-    // token so we can look up the owner on /auth/refresh without requiring
-    // the client to also send a userId.
+    // Generate and persist a refresh token for THIS device. The userId is
+    // prefixed onto the token so we can look up the owner on /auth/refresh
+    // without requiring the client to also send a userId.
     const refreshToken = `${user.id}${REFRESH_TOKEN_SEPARATOR}${uuidv4()}`;
-    const refreshTokenExpiry = new Date(
-      Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
-    );
 
-    user.refreshTokenHash = hashRefreshToken(refreshToken);
-    user.refreshTokenExpiry = refreshTokenExpiry;
-    await this.usersService.update(user.id, user);
+    await this.usersService.addRefreshSession(
+      user.id,
+      hashRefreshToken(refreshToken),
+      refreshExpiry(),
+      MAX_REFRESH_SESSIONS,
+    );
 
     return {
       access_token: accessToken,
@@ -269,9 +275,17 @@ export class AuthService {
   }
 
   /**
-   * Validates a refresh token, rotates the pair, and returns new tokens.
-   * The userId is recovered from the refresh token itself
-   * (`${userId}.${secret}`), so the client only needs to send the token.
+   * Validates a refresh token and issues a fresh access token. The userId is
+   * recovered from the refresh token itself (`${userId}.${secret}`), so the
+   * client only needs to send the token.
+   *
+   * ponytail: the refresh token is deliberately NOT rotated — its expiry is
+   * slid forward instead. Rotation needs a grace window for the old token,
+   * otherwise any concurrent refresh (this app runs one in the background
+   * isolate too) or any lost response permanently kills the session, which
+   * is exactly the random-logout bug this replaces. If replay detection is
+   * ever needed, add `{ prevHash, prevExpiry }` to the session entry and
+   * accept the previous hash for ~60s rather than reverting to bare rotation.
    */
   async refreshAccessToken(refreshToken: string) {
     const separatorIndex = refreshToken.indexOf(REFRESH_TOKEN_SEPARATOR);
@@ -280,39 +294,46 @@ export class AuthService {
     }
     const userId = refreshToken.slice(0, separatorIndex);
 
+    const alive = await this.usersService.touchRefreshSession(
+      userId,
+      hashRefreshToken(refreshToken),
+      refreshExpiry(),
+      MAX_REFRESH_SESSIONS,
+    );
+    if (!alive) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
     const user = await this.usersService.getByUserId(userId);
-    if (!user || !user.refreshTokenHash || !user.refreshTokenExpiry) {
+    if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // Check expiry
-    if (user.refreshTokenExpiry < new Date()) {
-      // Expired — wipe the token so it can never be reused
-      user.refreshTokenHash = null;
-      user.refreshTokenExpiry = null;
-      await this.usersService.update(user.id, user);
-      throw new UnauthorizedException('Refresh token expired');
-    }
-
-    // Verify hash (constant-time)
-    if (
-      !safeHashCompare(hashRefreshToken(refreshToken), user.refreshTokenHash)
-    ) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    // Rotate: issue a brand-new pair of tokens. The new login() overwrites
-    // user.refreshTokenHash, so the token we just consumed cannot be reused.
-    return this.login(user);
+    return {
+      access_token: this.jwtService.sign({
+        username: user.username,
+        sub: user.id,
+        role: user.role,
+      }),
+      refresh_token: refreshToken,
+      expires_in: ACCESS_TOKEN_TTL_SECONDS,
+      username: user.username,
+    };
   }
 
-  /** Invalidates the refresh token for the given user (server-side logout). */
-  async logout(userId: string): Promise<void> {
-    const user = await this.usersService.getByUserId(userId);
-    if (!user) return;
-    user.refreshTokenHash = null;
-    user.refreshTokenExpiry = null;
-    await this.usersService.update(user.id, user);
+  /**
+   * Server-side logout. With a refresh token, only that device's session is
+   * dropped; without one (older clients) every session is dropped.
+   */
+  async logout(userId: string, refreshToken?: string): Promise<void> {
+    if (refreshToken) {
+      await this.usersService.removeRefreshSession(
+        userId,
+        hashRefreshToken(refreshToken),
+      );
+      return;
+    }
+    await this.usersService.clearRefreshSessions(userId);
   }
 
   async forgotPassword(email: string) {
