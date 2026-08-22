@@ -20,6 +20,10 @@ import {
   REFRESH_TOKEN_SEPARATOR,
   REFRESH_TOKEN_TTL_DAYS,
 } from './auth.constants';
+import {
+  buildPasswordResetEmail,
+  buildVerificationEmail,
+} from './mail.templates';
 
 /** Sliding expiry: TTL counted from now, refreshed on every use. */
 function refreshExpiry(): Date {
@@ -216,15 +220,14 @@ export class AuthService {
     verificationToken: string | Uint8Array,
     registerDto: RegisterUserDTO,
   ) {
-    // Envía el correo de verificación
     const host = process.env.FRONTEND_URL;
     const verificationLink = `${host}/verify-email?token=${verificationToken}`;
-    const mailOptions = {
-      from: 'noreply@rayuela.com',
-      to: registerDto.email,
-      subject: 'Verificación de correo',
-      text: `Por favor, verifica tu correo haciendo clic en el siguiente enlace: ${verificationLink}`,
-    };
+    const name = registerDto.complete_name || registerDto.username;
+    const mailOptions = buildVerificationEmail(
+      registerDto.email,
+      name,
+      verificationLink,
+    );
 
     try {
       await this.transporter.sendMail(mailOptions);
@@ -346,14 +349,8 @@ export class AuthService {
     await this.usersService.saveResetToken(user.id, resetToken);
 
     const host = process.env.FRONTEND_URL;
-
     const resetLink = `${host}/reset-password?token=${resetToken}`;
-    const mailOptions = {
-      from: 'noreply@rayuela.com', // Dirección de correo del remitente
-      to: email, // Dirección de correo del destinatario
-      subject: 'Contraseña olvidada', // Asunto del correo
-      text: `Parece que has olvidado tu contraseña! Puedes resetearla en este link ${resetLink} `,
-    };
+    const mailOptions = buildPasswordResetEmail(email, resetLink);
 
     try {
       await this.transporter.sendMail(mailOptions);
