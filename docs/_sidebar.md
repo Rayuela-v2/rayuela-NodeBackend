@@ -4,6 +4,9 @@
 - [Gamification & Badges Architecture](gamification-badges.md)
 - <a href="directed_graph_tool.html" target="_blank">Badge Graph Drawing Tool</a>
 
+- **Adaptive Gamification Strategies**
+  - [Badge Fading](adaptive-gamification/badge-fading.md)
+
 - **Mobile Application**
   - [Architecture Overview](mobile/README.md)
   - [Offline Sync Architecture](mobile/offline-sync.md)

@@ -6,5 +6,7 @@ This repository contains the NestJS-based REST API and management backend for th
 
 ## Quick Links
 - [Deployment](deployment)
+- [Gamification Architecture](gamification-badges)
+- [Adaptive Gamification: Badge Fading](adaptive-gamification/badge-fading)
 - [Mobile Architecture](mobile/)
 - [GitHub Repository](https://github.com/Rayuela-v2/rayuela-NodeBackend)
