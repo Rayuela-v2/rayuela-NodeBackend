@@ -280,3 +280,108 @@ sequenceDiagram
    All database queries, unread counters, and in-app notifications are filtered by `user_id`, maintaining user boundaries when multiple accounts switch on the same device.
 4. **Reactive Render Safety**:
    Transitions from unread to read status use latched state checks (`_markedRead`) executed inside post-frame callbacks to prevent cyclic UI re-renders in Flutter.
+
+---
+
+## 6. End-to-End Walkthrough & Visual Example
+
+Below is a complete step-by-step walkthrough illustrating the lifecycle of a fading badge from the initial administrator trigger to user discovery, dialog alerts, and deep-linked exploration on mobile.
+
+### Step 1: Administrator Triggers Badge Fading (Backend)
+An administrator initiates a fading window by sending a `PATCH` request specifying an expiration deadline (e.g., 5 days in the future) and an explanatory rationale:
+
+```http
+PATCH /v1/gamification/6a41715197daf01ca5f165a1/badge/6a4a7e9b59f9a50103a3cda7/status/faded
+Authorization: Bearer <admin_jwt_token>
+Content-Type: application/json
+
+{
+  "expiresAt": "2026-08-29T00:38:13Z",
+  "fadeReason": "Poca actividad en la zona en el último mes"
+}
+```
+
+The backend updates the gamification rule to `status: "faded"`, recording `expiresAt` and `fadeReason` on the project.
+
+<p align="center">
+  <img src="images/badge-fading/screen_dashboard.png" alt="Step 1: Dashboard with active projects" style="max-width: 320px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0;" />
+  <br>
+  <em>Figure 1: Authenticated Dashboard displaying active citizen science projects.</em>
+</p>
+
+---
+
+### Step 2: In-App Transition Alert Dialog (Mobile)
+When a volunteer opens the project card (e.g., *Test Badge Fading*), the mobile client synchronizes the project details:
+* `BadgeNotificationRecorder` creates records in the local SQLite table for fading badges (`Badge A`, `Badge B`).
+* `showPendingBadgePopup` intercepts the unseen notification and presents a modal `AlertDialog` with the live countdown and context reason.
+* The event is immediately marked `seen_at` so reopening the project does not nag the volunteer again.
+
+<p align="center">
+  <img src="images/badge-fading/screen_popup_dialog.png" alt="Step 2: In-App Popup Transition Alert" style="max-width: 320px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0;" />
+  <br>
+  <em>Figure 2: In-App popup alert notifying the volunteer of the fading badge window.</em>
+</p>
+
+---
+
+### Step 3: Faded Badge Details & Earning Requirements
+Tapping **"Ver insignia"** directly opens the Badge Details modal bottom sheet:
+* Displays the amber **¡Se desvanece!** warning chip (*"Todavía podés conseguirla. Después, no."*).
+* Summarizes the required missions (e.g., *2 misiones*), zone boundaries (e.g., *Zone B*), and prerequisite badges (e.g., *Badge Wellcome*).
+
+<p align="center">
+  <img src="images/badge-fading/screen_badge_detail.png" alt="Step 3: Faded Badge Detail Sheet" style="max-width: 320px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0;" />
+  <br>
+  <em>Figure 3: Badge detail sheet displaying expiration warning and contribution criteria.</em>
+</p>
+
+---
+
+### Step 4: Dashboard Notification Bell
+Back on the main application dashboard, the `NotificationBell` in the `AppBar` reflects unread items derived from synced projects:
+* Reads reactively from `unreadNotificationsCountProvider`.
+* Fully accessible for screen readers with localized labels.
+* Tapping routes the volunteer to the dedicated Notification Center (`/notifications`).
+
+<p align="center">
+  <img src="images/badge-fading/screen_dashboard_bell.png" alt="Step 4: Dashboard Notification Bell" style="max-width: 320px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0;" />
+  <br>
+  <em>Figure 4: AppBar Notification Bell badge indicating unread notifications.</em>
+</p>
+
+---
+
+### Step 5: Notification Center Screen (`Novedades`)
+The Notification Center aggregates announcements across all subscribed projects for the volunteer:
+* **Dynamic Countdown Chip**: Displays computed time remaining (e.g., *Quedan 4 días*) against the local clock.
+* **Contextual Rationale**: Displays the administrator's `fadeReason` in italic subtitle.
+* **Read-State Latching**: Softly highlights unread items upon entry and marks them `read_at` safely without triggering UI rebuild loops.
+
+<p align="center">
+  <img src="images/badge-fading/screen_notifications_center.png" alt="Step 5: Notification Center Screen" style="max-width: 320px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0;" />
+  <br>
+  <em>Figure 5: Notification Center list with dynamic countdown tags and reason details.</em>
+</p>
+
+---
+
+### Step 6: Direct Deep-Link Navigation to Badge
+Tapping any notification card (e.g., *«Badge A» se está desvaneciendo*) marks the notification as seen and deep-links directly via `GoRouter`:
+
+```dart
+context.pushNamed(
+  AppRoute.projectDetail,
+  pathParameters: {'projectId': '6a41715197daf01ca5f165a1'},
+  queryParameters: {'badge': 'Badge A'},
+);
+```
+
+Upon landing on `ProjectDetailScreen`, the app recognizes the `focusBadge` query parameter and immediately presents the badge modal sheet on the first frame.
+
+<p align="center">
+  <img src="images/badge-fading/screen_deeplink_badge_a.png" alt="Step 6: Deep-linked Badge Sheet on arrival" style="max-width: 320px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border: 1px solid #e2e8f0;" />
+  <br>
+  <em>Figure 6: Target badge detail sheet displayed automatically upon arrival.</em>
+</p>
+
