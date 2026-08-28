@@ -31,17 +31,17 @@ export class TaskDao {
   }
 
   async getTasksByProject(projectId: string): Promise<Task[]> {
+    const project: Project = await this.projectDao.findOne(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
     const tasks: TaskDocument[] = await this.taskModel
       .find({ projectId })
       .exec();
     if (!tasks) {
       throw new NotFoundException('No tasks found for this project');
     }
-    const res = [];
-    for (const task of tasks) {
-      res.push(await this.mapDocToTask(task));
-    }
-    return res;
+    return tasks.map((task) => this.mapDocToTaskWithProject(task, project));
   }
 
   async updateTask(
@@ -64,30 +64,34 @@ export class TaskDao {
     return this.taskModel.findOne({ $or: [{ name }, { description }] }).exec();
   }
 
-  private async mapDocToTask(doc: TaskDocument): Promise<Task> {
-    const project: Project = await this.projectDao.findOne(
-      doc.projectId.toString(),
-    );
-    const area = project.areas.features.find(
-      (f) => f.properties.id?.toString() === doc.areaId?.toString(),
+  private mapDocToTaskWithProject(doc: TaskDocument, project: Project): Task {
+    const area = project.areas?.features?.find(
+      (f) => f.properties?.id?.toString() === doc.areaId?.toString(),
     );
     return new Task(
       doc._id,
       doc.name,
       doc.description,
       doc.projectId.toString(),
-      this.mapTimeRestriction(doc.timeIntervalId.toString(), project),
+      this.mapTimeRestriction(doc.timeIntervalId?.toString(), project),
       area,
       doc.type,
       doc.solved,
     );
   }
 
+  private async mapDocToTask(doc: TaskDocument): Promise<Task> {
+    const project: Project = await this.projectDao.findOne(
+      doc.projectId.toString(),
+    );
+    return this.mapDocToTaskWithProject(doc, project);
+  }
+
   private mapTimeRestriction(
     timeIntervalId: string,
     project: Project,
   ): TimeInterval {
-    const ti = project.timeIntervals.find((t) => t.name === timeIntervalId);
+    const ti = project.timeIntervals?.find((t) => t.name === timeIntervalId);
     return new TimeInterval(
       ti?.name || 'unavailable',
       ti?.days,
@@ -106,18 +110,18 @@ export class TaskDao {
     return await this.taskModel.insertMany(createTaskDtoList);
   }
 
-  async getRawTasksByProject(projectId: string) {
+  async getRawTasksByProject(projectId: string): Promise<Task[]> {
+    const project: Project = await this.projectDao.findOne(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
     const tasks: TaskDocument[] = await this.taskModel
       .find({ projectId })
       .exec();
     if (!tasks) {
       throw new NotFoundException('No tasks found for this project');
     }
-    const res: Task[] = [];
-    for (const task of tasks) {
-      res.push(await this.mapDocToTask(task));
-    }
-    return res;
+    return tasks.map((task) => this.mapDocToTaskWithProject(task, project));
   }
 
   async setTaskAsSolved(id: string): Promise<TaskDocument | null> {

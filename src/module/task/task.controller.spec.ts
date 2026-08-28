@@ -13,6 +13,7 @@ describe('TaskController', () => {
     removeUselessFrom: jest.fn(),
     create: jest.fn(),
     findRawByProjectId: jest.fn(),
+    findForAdmin: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
@@ -53,6 +54,11 @@ describe('TaskController', () => {
     // and we're just testing the controller call, we can mock the service.create
     await controller.create(dto);
     expect(service.create).toHaveBeenCalled();
+  });
+
+  it('should call findForAdmin', async () => {
+    await controller.findForAdmin('p1');
+    expect(service.findForAdmin).toHaveBeenCalledWith('p1');
   });
 
   it('should call findAllByProject', async () => {

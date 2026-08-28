@@ -60,6 +60,11 @@ export class TaskService {
     }));
   }
 
+  async findForAdmin(projectId: string): Promise<any[]> {
+    const tasks = await this.taskDao.getTasksByProject(projectId);
+    return tasks.map((task) => task.toJSON());
+  }
+
   async findByProjectId(projectId: string): Promise<Task[]> {
     return await this.taskDao.getTasksByProject(projectId);
   }

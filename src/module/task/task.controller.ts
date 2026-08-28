@@ -45,6 +45,13 @@ export class TaskController {
     return this.taskService.create(CreateTaskDto.fromDTO(createTaskDto));
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  @Get('/admin/project/:id')
+  async findForAdmin(@Param('id') projectId: string) {
+    return await this.taskService.findForAdmin(projectId);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('/project/:id')
   async findAllByProject(@Param('id') projectId: string, @Req() req) {

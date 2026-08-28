@@ -179,6 +179,16 @@ describe('TaskService', () => {
     });
   });
 
+  describe('findForAdmin', () => {
+    it('should return tasks mapped to JSON for admin', async () => {
+      const task = TaskBuilder.withId('task1').build();
+      mockTaskDao.getTasksByProject.mockResolvedValue([task]);
+      const result = await service.findForAdmin('p1');
+      expect(result).toEqual([task.toJSON()]);
+      expect(mockTaskDao.getTasksByProject).toHaveBeenCalledWith('p1');
+    });
+  });
+
   describe('findByProjectId', () => {
     it('should return tasks for a project', async () => {
       const tasks = [TaskBuilder.build()];
