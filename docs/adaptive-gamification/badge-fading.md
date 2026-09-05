@@ -37,6 +37,10 @@ In the domain model (`lib/features/dashboard/domain/entities/project_detail.dart
 | `faded` | `expiresAt > now` | `fading` | Amber warning hourglass icon, active countdown ("X days left", "Y hours left"), popup alerts, and scheduled OS alarms. |
 | `faded` / `expired` | `expiresAt <= now` | `expired` | Disabled/greyed-out badge; historical expiration notification; window permanently closed. |
 
+> [!TIP]
+> **Interactive Simulation Sandbox**:
+> Want to see how badge fading rules, interest indicators ($i_3, CII$), and motivation scores ($PMI, CMI$) behave dynamically with simulated volunteer contributions? Try the [Vanishing Badges Simulator](adaptive-gamification/simulator.md) or <a href="vanishing_badges_simulator.html" target="_blank">open the simulator in fullscreen ↗</a>.
+
 ---
 
 ## 2. System Architecture

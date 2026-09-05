@@ -1,0 +1,2121 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vanishing Badges Adaptation & Indicators Simulator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            success: '#10b981',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    @keyframes pulse-fade {
+      0%, 100% { opacity: 1; border-color: rgba(245, 158, 11, 0.9); box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
+      50% { opacity: 0.7; border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 0 5px rgba(245, 158, 11, 0.1); }
+    }
+    .badge-fading-pulse {
+      animation: pulse-fade 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden text-sm select-none">
+
+  <!-- Top Navigation & Global Metrics -->
+  <header class="bg-slate-950 border-b border-slate-800 px-6 py-3 flex-shrink-0 flex items-center justify-between z-10 shadow-lg">
+    <div class="flex items-center space-x-3">
+      <div class="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg border border-indigo-500/30">
+        <i data-lucide="sparkles" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-base tracking-tight text-white flex items-center gap-2">
+          Vanishing Badges Simulator
+          <span class="text-xs font-mono font-normal bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-full">
+            CLCS Adaptation Engine
+          </span>
+        </h1>
+        <p class="text-xs text-slate-400">Torres & Dalponte Ayastuy (2026) Heuristics & Indicators Validation</p>
+      </div>
+    </div>
+
+    <!-- Timeline & Controls -->
+    <div class="flex items-center space-x-4 bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-800">
+      <div class="flex items-center space-x-2">
+        <span class="text-xs uppercase text-slate-400 font-semibold tracking-wider">Simulation Clock:</span>
+        <span id="current-day-label" class="font-mono text-sm font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-800">
+          Day 1 (Period 1)
+        </span>
+      </div>
+
+      <div class="h-4 w-px bg-slate-700"></div>
+
+      <button id="btn-next-day" class="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium transition text-xs shadow-md hover:shadow-indigo-500/25">
+        <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i>
+        <span>Advance +1 Day</span>
+      </button>
+
+      <button id="btn-next-period" class="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium transition text-xs border border-slate-700">
+        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+        <span>+1 Period (3 Days)</span>
+      </button>
+
+      <button id="btn-reset" class="flex items-center space-x-1.5 px-2.5 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 rounded-lg font-medium transition text-xs border border-rose-800/50" title="Reset all collaborations and clock">
+        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+        <span>Reset</span>
+      </button>
+    </div>
+
+    <!-- Presets & Tools -->
+    <div class="flex items-center space-x-2">
+      <div class="relative">
+        <select id="preset-scenario-select" class="bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="" disabled selected>⚡ Load Scenario Preset...</option>
+          <option value="empty">1. Clean Slate (0 Contribs)</option>
+          <option value="healthy">2. Healthy Growing Community (High CMI)</option>
+          <option value="slump">3. Motivation Slump (Trigger CMI Alert)</option>
+          <option value="bottleneck">4. Ignored Badge Bottleneck (Low CII Decay)</option>
+        </select>
+      </div>
+
+      <button id="btn-export-json" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700" title="Export State as JSON">
+        <i data-lucide="download" class="w-4 h-4"></i>
+      </button>
+      <label class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 cursor-pointer" title="Import State JSON">
+        <i data-lucide="upload" class="w-4 h-4"></i>
+        <input type="file" id="import-json-file" class="hidden" accept=".json">
+      </label>
+    </div>
+  </header>
+
+  <!-- Global Indicators Metric Bar -->
+  <div class="bg-slate-900/90 border-b border-slate-800 px-6 py-2.5 flex-shrink-0 grid grid-cols-5 gap-4 text-xs">
+    <!-- CMI -->
+    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800" id="card-cmi">
+      <div>
+        <div class="flex items-center gap-1.5 text-slate-400 font-medium">
+          <span>Community Motivation (CMI)</span>
+          <span class="cursor-pointer text-indigo-400 hover:text-indigo-300" onclick="showFormulaModal('cmi')"><i data-lucide="help-circle" class="w-3 h-3"></i></span>
+        </div>
+        <div class="text-lg font-bold font-mono mt-0.5 text-white flex items-baseline gap-2">
+          <span id="metric-cmi-val">1.00</span>
+          <span id="metric-cmi-badge" class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">Healthy</span>
+        </div>
+      </div>
+      <div class="text-right text-[11px] text-slate-500 font-mono">
+        <div>Median relPMI</div>
+        <div>Trigger: &lt; <span id="threshold-cmi-val">0.75</span></div>
+      </div>
+    </div>
+
+    <!-- Avg PMI -->
+    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+      <div>
+        <div class="flex items-center gap-1.5 text-slate-400 font-medium">
+          <span>Avg Player Motivation (PMI)</span>
+          <span class="cursor-pointer text-indigo-400 hover:text-indigo-300" onclick="showFormulaModal('pmi')"><i data-lucide="help-circle" class="w-3 h-3"></i></span>
+        </div>
+        <div class="text-lg font-bold font-mono mt-0.5 text-white flex items-baseline gap-2">
+          <span id="metric-avg-pmi">0.00</span>
+          <span class="text-xs text-slate-500 font-normal">periods</span>
+        </div>
+      </div>
+      <div class="text-right text-[11px] text-slate-500 font-mono">
+        <div>Max: <span id="metric-max-pmi">0</span></div>
+        <div>Min: <span id="metric-min-pmi">0</span></div>
+      </div>
+    </div>
+
+    <!-- Community Activity -->
+    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+      <div>
+        <div class="text-slate-400 font-medium">Total Collaborations</div>
+        <div class="text-lg font-bold font-mono mt-0.5 text-indigo-400 flex items-baseline gap-2">
+          <span id="metric-total-contribs">0</span>
+          <span class="text-xs text-slate-500 font-normal">check-ins</span>
+        </div>
+      </div>
+      <div class="text-right text-[11px] text-slate-500 font-mono">
+        <div>Active: <span id="metric-active-players" class="text-slate-300">0</span>/20</div>
+        <div>Badges: <span id="metric-total-badges-awarded" class="text-amber-400">0</span></div>
+      </div>
+    </div>
+
+    <!-- Fading Badges -->
+    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+      <div>
+        <div class="text-slate-400 font-medium">Fading / Expired Badges</div>
+        <div class="text-lg font-bold font-mono mt-0.5 text-amber-400 flex items-baseline gap-2">
+          <span id="metric-fading-count">0</span>
+          <span class="text-xs text-slate-500 font-normal">fading / <span id="metric-expired-count">0</span> exp</span>
+        </div>
+      </div>
+      <div class="text-right text-[11px] text-slate-500 font-mono">
+        <div>Top Low CII:</div>
+        <div id="metric-lowest-cii-badge" class="text-amber-300 truncate max-w-[90px]">None</div>
+      </div>
+    </div>
+
+    <!-- Adaptation Trigger Status -->
+    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800" id="card-trigger-status">
+      <div>
+        <div class="text-slate-400 font-medium">Heuristic Trigger Status</div>
+        <div class="text-sm font-bold font-mono mt-1 flex items-center gap-1.5">
+          <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          <span id="status-text" class="text-emerald-400 uppercase tracking-wide text-xs">IDLE (OK)</span>
+        </div>
+      </div>
+      <button id="btn-run-heuristic" class="px-2.5 py-1 bg-amber-600/80 hover:bg-amber-500 text-white rounded font-medium text-[11px] transition shadow">
+        Evaluate §4
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content Layout (Split into Tabs & Panels) -->
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- LEFT PANEL: Players, Add Data & Recent Log (Width: 380px) -->
+    <div class="w-96 bg-slate-950 border-r border-slate-800 flex flex-col flex-shrink-0 overflow-hidden">
+      
+      <!-- Panel Header & Switcher -->
+      <div class="p-2.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+        <span class="font-semibold text-xs text-slate-200 flex items-center gap-1.5">
+          <i data-lucide="users" class="w-4 h-4 text-indigo-400"></i>
+          Community Players (20)
+        </span>
+        <div class="flex items-center space-x-1">
+          <button id="tab-btn-players" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium">Players</button>
+          <button id="tab-btn-add" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-medium">+ Add Data</button>
+          <button id="tab-btn-log" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-medium">Log</button>
+        </div>
+      </div>
+
+      <!-- Tab Content 1: Add Data Form -->
+      <div id="tab-content-add" class="hidden p-4 overflow-y-auto space-y-4 flex-1">
+        <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-3 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h3 class="font-semibold text-xs text-indigo-300 uppercase tracking-wider flex items-center gap-1">
+              <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Single Contribution
+            </h3>
+            <span id="form-period-indicator" class="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+              Period 1
+            </span>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Select Player</label>
+            <select id="form-player-select" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">Target Task / Badge Requirement</label>
+            <select id="form-badge-select" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:ring-1 focus:ring-indigo-500">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <label class="text-[11px] text-slate-400">Date (Day)</label>
+                <button id="btn-sync-form-day" class="text-[9px] text-indigo-400 hover:underline">Use Current Day</button>
+              </div>
+              <input type="number" id="form-day-input" min="1" max="999" value="1" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 font-mono">
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Quantity</label>
+              <input type="number" id="form-qty-input" min="1" max="20" value="1" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 font-mono">
+            </div>
+          </div>
+
+          <button id="btn-submit-contrib" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold text-xs transition shadow-md flex items-center justify-center gap-1.5">
+            <i data-lucide="send" class="w-3.5 h-3.5"></i> Add Contribution
+          </button>
+        </div>
+
+        <!-- Quick Batch Actions -->
+        <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+          <h3 class="font-semibold text-xs text-slate-400 uppercase tracking-wider flex items-center gap-1">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i> Quick Simulation Generators
+          </h3>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-quick-random-active" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-medium border border-slate-700 text-left transition">
+              🎲 +1 to 5 Random Active
+            </button>
+            <button id="btn-quick-everyone-root" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-medium border border-slate-700 text-left transition">
+              🌱 +1 Initial Badges All
+            </button>
+            <button id="btn-quick-slump-day" class="p-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 rounded-lg text-[11px] font-medium border border-rose-800/40 text-left transition">
+              📉 Generate Drop in Activity
+            </button>
+            <button id="btn-quick-rush-fading" class="p-2 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 rounded-lg text-[11px] font-medium border border-amber-800/40 text-left transition">
+              🏃 Community Rush Fading
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Players List & Metrics -->
+      <div id="tab-content-players" class="flex-1 flex flex-col overflow-hidden">
+        <!-- Search & Filter -->
+        <div class="p-2 border-b border-slate-800 bg-slate-900/40 flex items-center gap-2">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+            <input type="text" id="player-search" placeholder="Search player..." class="w-full bg-slate-950 border border-slate-800 rounded-lg pl-8 pr-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          </div>
+          <select id="player-sort" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300">
+            <option value="id"># ID</option>
+            <option value="pmi">PMI (High)</option>
+            <option value="relPMI">relPMI</option>
+            <option value="contribs">Contribs</option>
+            <option value="badges">Badges</option>
+          </select>
+        </div>
+
+        <!-- Players Table -->
+        <div class="flex-1 overflow-y-auto divide-y divide-slate-800/60" id="players-list-container">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Tab Content 3: Contributions History Log & Undo -->
+      <div id="tab-content-log" class="hidden flex-1 flex flex-col overflow-hidden p-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-300">Recent Collaborations Log</span>
+          <button id="btn-clear-collabs" class="text-[10px] text-rose-400 hover:underline">Clear All</button>
+        </div>
+        <div class="flex-1 overflow-y-auto divide-y divide-slate-800/60 bg-slate-900 rounded-lg border border-slate-800 p-2 space-y-1.5 font-mono text-[11px]" id="collabs-log-container">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Selected Player Inspector Drawer at bottom of left panel -->
+      <div id="player-detail-drawer" class="p-3 bg-slate-900 border-t border-slate-800 hidden flex-shrink-0 max-h-48 overflow-y-auto">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span id="detail-player-avatar" class="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-[10px] text-white">LM</span>
+            <span id="detail-player-name" class="font-bold text-xs text-white">lucas_mat</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-quick-add-for-player" class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-semibold">+ Add Contrib</button>
+            <button onclick="closePlayerDetail()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-1.5 text-[11px] font-mono mb-2">
+          <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+            <div class="text-slate-500 text-[9px]">PMI(p)</div>
+            <div id="detail-player-pmi" class="font-bold text-indigo-400">0</div>
+          </div>
+          <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+            <div class="text-slate-500 text-[9px]">relPMI(p)</div>
+            <div id="detail-player-relpmi" class="font-bold text-emerald-400">1.00</div>
+          </div>
+          <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+            <div class="text-slate-500 text-[9px]">Contribs</div>
+            <div id="detail-player-contribs" class="font-bold text-slate-200">0</div>
+          </div>
+        </div>
+        <div class="text-[10px] text-slate-400 mb-1 font-semibold">Individual Interest i3(p, b) (Eligible Badges):</div>
+        <div id="detail-player-i3-list" class="space-y-1 text-[11px]">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER & RIGHT: Visual Badge Dependency Graph & Matrix (Tabs) -->
+    <div class="flex-1 flex flex-col overflow-hidden bg-slate-900/30">
+      
+      <!-- Sub Tabs Bar -->
+      <div class="px-6 py-2 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
+        <div class="flex items-center space-x-2">
+          <button id="view-tab-graph" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white flex items-center gap-1.5 shadow">
+            <i data-lucide="git-fork" class="w-3.5 h-3.5"></i> Badge Dependency Graph (Figure 1)
+          </button>
+          <button id="view-tab-matrix" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5 border border-slate-700">
+            <i data-lucide="grid" class="w-3.5 h-3.5"></i> Period Motivation Matrix [cnum(p, s)]
+          </button>
+          <button id="view-tab-heuristics" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5 border border-slate-700">
+            <i data-lucide="sliders" class="w-3.5 h-3.5"></i> Heuristic Pipeline (§4 Execution)
+          </button>
+          <button id="view-tab-formulas" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5 border border-slate-700">
+            <i data-lucide="book-open" class="w-3.5 h-3.5"></i> Mathematical Definitions (§3)
+          </button>
+        </div>
+
+        <div class="flex items-center space-x-3 text-xs text-slate-400">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500"></span> Active
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded bg-amber-500/20 border border-amber-500 animate-pulse"></span> Fading (Countdown)
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded bg-rose-500/20 border border-rose-500"></span> Expired
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 1: Interactive SVG Badge Graph -->
+      <div id="panel-graph-view" class="flex-1 flex flex-col overflow-hidden p-4 relative">
+        <div class="flex-1 bg-slate-950 rounded-2xl border border-slate-800 relative overflow-hidden shadow-inner flex flex-col">
+          <!-- Graph Toolbar -->
+          <div class="absolute top-3 left-4 z-10 flex items-center gap-2 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+            <span class="text-slate-400 font-medium">Graph View:</span>
+            <span class="text-indigo-300 font-semibold">12 Badges (4 Tiers)</span>
+            <span class="text-slate-600">|</span>
+            <span class="text-slate-400">Click a badge node to inspect details</span>
+          </div>
+
+          <!-- SVG Canvas Container -->
+          <div class="flex-1 w-full h-full relative" id="svg-graph-container">
+            <svg id="badge-graph-svg" class="w-full h-full" viewBox="0 0 1050 490">
+              <defs>
+                <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                  <polygon points="0 0, 8 3, 0 6" fill="#475569" />
+                </marker>
+                <marker id="arrowhead-active" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                  <polygon points="0 0, 8 3, 0 6" fill="#818cf8" />
+                </marker>
+                <marker id="arrowhead-warning" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                  <polygon points="0 0, 8 3, 0 6" fill="#f59e0b" />
+                </marker>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+              </defs>
+              <g id="svg-links-layer"></g>
+              <g id="svg-nodes-layer"></g>
+            </svg>
+          </div>
+
+          <!-- Badge Ranking & Summary Table at bottom of graph -->
+          <div class="h-44 border-t border-slate-800 bg-slate-950/90 p-3 overflow-y-auto flex-shrink-0">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-indigo-400"></i>
+                Badges Ranking & Indicators Summary (CII Ascending Order)
+              </span>
+              <span class="text-[11px] text-slate-500 font-mono">Sorted for §4.2.2 Candidate Selection</span>
+            </div>
+            <table class="w-full text-left text-xs">
+              <thead class="text-[10px] uppercase tracking-wider text-slate-500 font-mono border-b border-slate-800">
+                <tr>
+                  <th class="pb-1.5">Badge Name</th>
+                  <th class="pb-1.5">Prerequisites</th>
+                  <th class="pb-1.5 text-center">Req Contribs</th>
+                  <th class="pb-1.5 text-center">Earned (|U_b|)</th>
+                  <th class="pb-1.5 text-center">Estimated Award (ET_b)</th>
+                  <th class="pb-1.5 text-center">Eligible (ep)</th>
+                  <th class="pb-1.5 text-center">Community Interest (CII)</th>
+                  <th class="pb-1.5 text-center">Status</th>
+                  <th class="pb-1.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="badge-ranking-tbody" class="divide-y divide-slate-800/60 font-mono text-[11px]">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Period Motivation Matrix View -->
+      <div id="panel-matrix-view" class="hidden flex-1 p-4 overflow-y-auto space-y-4">
+        <div class="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="table" class="w-4 h-4 text-indigo-400"></i>
+                Player Period Contributions Matrix cnum(p, s) & Motivation Evaluation
+              </h2>
+              <p class="text-xs text-slate-400">
+                Commitment Rule: Period s is committed (+1 PMI) if cnum(p, s) &ge; cnum(p, prev(s)) and [cnum(p, s) + cnum(p, prev(s))] &ne; 0.
+              </p>
+            </div>
+            <div class="flex items-center gap-2 text-xs font-mono">
+              <span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">✓ Committed (+1 PMI)</span>
+              <span class="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">✗ Decreased (0 PMI)</span>
+              <span class="px-2 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">- Inactive (0+0)</span>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse font-mono">
+              <thead id="matrix-thead" class="text-[11px] uppercase tracking-wider text-slate-400 bg-slate-900 border-b border-slate-800">
+                <!-- Dynamic Header with Periods -->
+              </thead>
+              <tbody id="matrix-tbody" class="divide-y divide-slate-800/80 text-[11px]">
+                <!-- Dynamic Rows for 20 Players -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: Heuristic Execution Pipeline (§4) -->
+      <div id="panel-heuristics-view" class="hidden flex-1 p-4 overflow-y-auto space-y-4">
+        <div class="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="cpu" class="w-5 h-5 text-amber-400"></i>
+                Vanishing Badges Adaptation Engine (§4 Heuristic Pipeline)
+              </h2>
+              <p class="text-xs text-slate-400">Step-by-step evaluation of the Vanishing Badge algorithm from the paper.</p>
+            </div>
+            <button id="btn-pipeline-execute" class="px-4 py-2 bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 text-white rounded-lg font-bold text-xs shadow-lg transition flex items-center gap-2">
+              <i data-lucide="play" class="w-4 h-4"></i> Run Pipeline
+            </button>
+          </div>
+
+          <!-- 4 Steps Interactive Cards -->
+          <div class="grid grid-cols-4 gap-3">
+            <!-- Step 1 -->
+            <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-indigo-400">§4.1 Trigger Condition</span>
+                <span id="pipe-step1-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400">Checking...</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Triggered if CMI &lt; threshold (Current: <span id="pipe-cmi-val" class="font-mono text-white">1.00</span>)</p>
+              <div class="text-[11px] text-slate-300 font-mono bg-slate-950 p-2 rounded border border-slate-800" id="pipe-step1-detail">
+                Ready for check.
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-indigo-400">§4.2.1 Filtering</span>
+                <span id="pipe-step2-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400">Filter</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Removes badges earned by all or unreachable by anyone.</p>
+              <div class="text-[11px] text-slate-300 font-mono bg-slate-950 p-2 rounded border border-slate-800" id="pipe-step2-detail">
+                Eligible pool: 0 badges.
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-indigo-400">§4.2.2 - 4.2.3 Selection</span>
+                <span id="pipe-step3-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400">Rank</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Sorts candidate badges ascending by CII(b) and picks lowest.</p>
+              <div class="text-[11px] text-slate-300 font-mono bg-slate-950 p-2 rounded border border-slate-800" id="pipe-step3-detail">
+                Selected: None.
+              </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-indigo-400">§4.3 Removal Schedule</span>
+                <span id="pipe-step4-badge" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400">Schedule</span>
+              </div>
+              <p class="text-[11px] text-slate-400">Calculates expiration window: T_expiry = now + ET_b.</p>
+              <div class="text-[11px] text-slate-300 font-mono bg-slate-950 p-2 rounded border border-slate-800" id="pipe-step4-detail">
+                Expiration: None.
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Action Panel -->
+          <div class="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-3">
+            <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider">Manual Adaptation Operations</h3>
+            <div class="flex items-center gap-3">
+              <div class="flex-1">
+                <label class="block text-[11px] text-slate-400 mb-1">Target Badge to Mark as Fading</label>
+                <select id="select-manual-fade-badge" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200">
+                  <!-- Populated dynamically -->
+                </select>
+              </div>
+              <div class="w-32">
+                <label class="block text-[11px] text-slate-400 mb-1">Fade Window (Days)</label>
+                <input type="number" id="input-fade-duration" value="5" min="1" max="30" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 font-mono">
+              </div>
+              <div class="pt-5">
+                <button id="btn-apply-fade" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold text-xs transition">
+                  Apply Fading State
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 4: Mathematical Definitions Reference -->
+      <div id="panel-formulas-view" class="hidden flex-1 p-4 overflow-y-auto space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          
+          <!-- Def 3.1 -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-400 text-xs uppercase">Definition 3.1: Estimated Awarding Time (ET_b)</span>
+              <span class="text-[10px] font-mono bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">Effort Metric</span>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800/80 font-mono text-xs text-slate-200">
+              ET_b = (1 / |U_b|) * &Sigma;_{u &isin; U_b} contributions(u at award time)
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Calculates the average number of contributions earned players had completed when they were awarded badge b. In §4.3, this determines the expiration window length.
+            </p>
+          </div>
+
+          <!-- Def 3.2 -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-400 text-xs uppercase">Definition 3.2: Individual Interest [i3(p, b)]</span>
+              <span class="text-[10px] font-mono bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">Recency Metric</span>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800/80 font-mono text-xs text-slate-200">
+              i3(p, b) = 1 / (now - t0(p, b)) &nbsp;[if achievable, else 1.0]
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              t0(p, b) is the day player p unlocked all prerequisites for badge b. If a long time has elapsed without earning b, i3 &rarr; 0 indicating abandonment.
+            </p>
+          </div>
+
+          <!-- Def 3.3 -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-400 text-xs uppercase">Definition 3.3: Community Interest [CII(b)]</span>
+              <span class="text-[10px] font-mono bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">Ranking Metric</span>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800/80 font-mono text-xs text-slate-200">
+              CII(b) = median( { i3(p, b) : p &isin; ep(b) } )
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Median of individual interest across all eligible players ep(b). Low CII(b) identifies badges that players have unlocked but are neglecting.
+            </p>
+          </div>
+
+          <!-- Def 3.4 & 3.5 -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-400 text-xs uppercase">Definitions 3.4 & 3.5: PMI, relPMI & CMI</span>
+              <span class="text-[10px] font-mono bg-indigo-950 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">Trigger Metric</span>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800/80 font-mono text-xs text-slate-200">
+              PMI(p) = |{ s : cnum(p,s) &ge; cnum(p,prev(s)) &ne; 0 }|<br>
+              relPMI(p) = PMI(p) / avg(PMI)<br>
+              CMI = median( { relPMI(p) : p &isin; P } )
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Measures period-over-period engagement growth momentum. CMI is the median relative motivation of the community and serves as the global adaptation trigger.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Formula Inspector & Live Calculation Trace -->
+  <div id="formula-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+        <h3 class="font-bold text-sm text-white flex items-center gap-2" id="modal-title">
+          <i data-lucide="calculator" class="w-4 h-4 text-indigo-400"></i> Mathematical Formula Trace
+        </h3>
+        <button onclick="closeFormulaModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-4 text-xs" id="modal-body">
+        <!-- Filled dynamically -->
+      </div>
+      <div class="p-3 border-t border-slate-800 bg-slate-950 flex justify-end">
+        <button onclick="closeFormulaModal()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLICATION LOGIC SCRIPT -->
+  <script>
+    // ==========================================
+    // 1. DATA MODEL DEFINITIONS & BADGE GRAPH
+    // ==========================================
+    
+    // 12 Badges matching Figure 1 of the paper
+    const BADGES_CONFIG = [
+      // Tier 1 (Initial / Roots - No Prerequisites, Top Level)
+      {
+        id: 'primer_experimento',
+        name: 'Primer Experimento',
+        icon: '🔬',
+        tier: 1,
+        reqCheckins: 1,
+        previousBadges: [],
+        x: 200, y: 30,
+        description: 'Realizar la primera contribución inicial'
+      },
+      {
+        id: 'lector_curioso',
+        name: 'Lector Curioso',
+        icon: '📖',
+        tier: 1,
+        reqCheckins: 1,
+        previousBadges: [],
+        x: 525, y: 30,
+        description: 'Lectura de guías o primera identificación'
+      },
+      {
+        id: 'divulgador',
+        name: 'Divulgador',
+        icon: '🌐',
+        tier: 1,
+        reqCheckins: 2,
+        previousBadges: [],
+        x: 850, y: 30,
+        description: 'Actividades de divulgación y comunicación comunitaria'
+      },
+
+      // Tier 2 (Directly under Tier 1 roots)
+      {
+        id: 'maestro_medicion',
+        name: 'Maestro de la Medición',
+        icon: '📏',
+        tier: 2,
+        reqCheckins: 3,
+        previousBadges: ['primer_experimento'],
+        x: 200, y: 145,
+        description: 'Muestreo preciso y mediciones en campo'
+      },
+      {
+        id: 'hipotesis_solida',
+        name: 'Hipótesis Sólida',
+        icon: '📝',
+        tier: 2,
+        reqCheckins: 3,
+        previousBadges: ['lector_curioso'],
+        x: 525, y: 145,
+        description: 'Formulación y registro de observaciones fundamentadas'
+      },
+      {
+        id: 'visualizador',
+        name: 'Visualizador',
+        icon: '📈',
+        tier: 2,
+        reqCheckins: 3,
+        previousBadges: ['divulgador'],
+        x: 850, y: 145,
+        description: 'Exploración de mapas y datos visuales'
+      },
+
+      // Tier 3 (Intermediate combinations)
+      {
+        id: 'reproducibilidad',
+        name: 'Reproducibilidad',
+        icon: '🔁',
+        tier: 3,
+        reqCheckins: 3,
+        previousBadges: ['maestro_medicion'],
+        x: 120, y: 265,
+        description: 'Validar observaciones duplicadas de otros participantes'
+      },
+      {
+        id: 'analista_datos',
+        name: 'Analista de Datos',
+        icon: '📊',
+        tier: 3,
+        reqCheckins: 4,
+        previousBadges: ['hipotesis_solida', 'reproducibilidad'],
+        x: 320, y: 265,
+        description: 'Procesamiento de muestras verificadas (requiere 2)'
+      },
+      {
+        id: 'metodo_cientifico',
+        name: 'Método Científico',
+        icon: '🧪',
+        tier: 3,
+        reqCheckins: 4,
+        previousBadges: ['maestro_medicion', 'hipotesis_solida'],
+        x: 525, y: 265,
+        description: 'Completar el ciclo de medición e hipótesis (requiere 2)'
+      },
+      {
+        id: 'revision_pares',
+        name: 'Revisión por Pares',
+        icon: '🤝',
+        tier: 3,
+        reqCheckins: 4,
+        previousBadges: ['metodo_cientifico', 'visualizador'],
+        x: 730, y: 265,
+        description: 'Validación cruzada comunitaria (requiere 2)'
+      },
+      {
+        id: 'publicacion',
+        name: 'Publicación',
+        icon: '📰',
+        tier: 3,
+        reqCheckins: 4,
+        previousBadges: ['visualizador', 'divulgador'],
+        x: 930, y: 265,
+        description: 'Publicar informe o reporte verificado (requiere 2)'
+      },
+
+      // Tier 4 (Consagrado - Bottom Apex)
+      {
+        id: 'cientifico_consagrado',
+        name: 'Científico Consagrado',
+        icon: '🏆',
+        tier: 4,
+        reqCheckins: 5,
+        previousBadges: ['analista_datos', 'revision_pares', 'publicacion'],
+        x: 525, y: 395,
+        description: 'Máximo reconocimiento científico (requiere 3 medallas)'
+      }
+    ];
+
+    // 20 Initial Player Names & Profiles
+    const PLAYERS_INIT = [
+      { id: 'p1', name: 'lucas_geo', joinDay: 1 },
+      { id: 'p2', name: 'sofia_bio', joinDay: 1 },
+      { id: 'p3', name: 'mateo_field', joinDay: 1 },
+      { id: 'p4', name: 'valentina_eco', joinDay: 1 },
+      { id: 'p5', name: 'carlos_vinchuca', joinDay: 1 },
+      { id: 'p6', name: 'elena_nature', joinDay: 1 },
+      { id: 'p7', name: 'martin_lab', joinDay: 1 },
+      { id: 'p8', name: 'camila_scout', joinDay: 1 },
+      { id: 'p9', name: 'julian_map', joinDay: 1 },
+      { id: 'p10', name: 'agustina_flora', joinDay: 1 },
+      { id: 'p11', name: 'diego_tracker', joinDay: 1 },
+      { id: 'p12', name: 'florencia_science', joinDay: 1 },
+      { id: 'p13', name: 'santiago_sensor', joinDay: 1 },
+      { id: 'p14', name: 'lucia_fauna', joinDay: 1 },
+      { id: 'p15', name: 'facundo_data', joinDay: 1 },
+      { id: 'p16', name: 'mariana_observer', joinDay: 1 },
+      { id: 'p17', name: 'ignacio_bug', joinDay: 1 },
+      { id: 'p18', name: 'carolina_botany', joinDay: 1 },
+      { id: 'p19', name: 'nicolas_rover', joinDay: 1 },
+      { id: 'p20', name: 'paula_entomo', joinDay: 1 }
+    ];
+
+    // ==========================================
+    // 2. SIMULATOR STATE
+    // ==========================================
+    let state = {
+      currentDay: 1,
+      daysPerPeriod: 3, // 1 period = 3 days
+      cmiThreshold: 0.75, // Alert trigger threshold for CMI
+      players: JSON.parse(JSON.stringify(PLAYERS_INIT)),
+      collaborations: [], // { id, playerId, badgeId, day, timestamp }
+      badgeStatusOverride: {}, // { badgeId: { status: 'active'|'faded'|'expired', fadedSinceDay, expiresAtDay, fadeReason } }
+      selectedPlayerId: null,
+      selectedBadgeId: null,
+      activeTab: 'players', // 'players' | 'add' | 'log'
+      activeView: 'graph',  // 'graph' | 'matrix' | 'heuristics' | 'formulas'
+      searchTerm: '',
+      sortBy: 'id'
+    };
+
+    // ==========================================
+    // 3. ENGINE CALCULATIONS & INDICATORS
+    // ==========================================
+
+    function getEffectiveBadgeStatus(badgeId, currentDay = state.currentDay) {
+      const override = state.badgeStatusOverride[badgeId];
+      if (!override) return 'active';
+      if (override.status === 'expired') return 'expired';
+      if (override.status === 'faded') {
+        if (override.expiresAtDay && currentDay > override.expiresAtDay) {
+          return 'expired';
+        }
+        return 'faded';
+      }
+      return 'active';
+    }
+
+    // Calculates all player progress, unlocked badges, t0 timestamps
+    function computeGamificationState() {
+      const currentDay = state.currentDay;
+      const currentPeriod = Math.max(1, Math.ceil(currentDay / state.daysPerPeriod));
+
+      // 1. Group collaborations per player and badge
+      const playerBadgesEarned = {}; // { playerId: { badgeId: { dayEarned, contribsAtEarn } } }
+      const playerBadgeContribCount = {}; // { playerId: { badgeId: count } }
+      const playerTotalContribs = {}; // { playerId: count }
+      const playerContribsPerPeriod = {}; // { playerId: { periodNum: count } }
+
+      state.players.forEach(p => {
+        playerBadgesEarned[p.id] = {};
+        playerBadgeContribCount[p.id] = {};
+        playerTotalContribs[p.id] = 0;
+        playerContribsPerPeriod[p.id] = {};
+        for (let s = 1; s <= currentPeriod; s++) {
+          playerContribsPerPeriod[p.id][s] = 0;
+        }
+      });
+
+      // Sort collaborations chronologically
+      const sortedCollabs = [...state.collaborations].sort((a, b) => a.day - b.day || a.timestamp - b.timestamp);
+
+      sortedCollabs.forEach(c => {
+        if (c.day > currentDay) return; // Future collaborations ignored
+
+        const pId = c.playerId;
+        const bId = c.badgeId;
+        const period = Math.max(1, Math.ceil(c.day / state.daysPerPeriod));
+
+        playerTotalContribs[pId] = (playerTotalContribs[pId] || 0) + 1;
+        playerContribsPerPeriod[pId][period] = (playerContribsPerPeriod[pId][period] || 0) + 1;
+        playerBadgeContribCount[pId][bId] = (playerBadgeContribCount[pId][bId] || 0) + 1;
+
+        // Check if badge is earned
+        const badgeCfg = BADGES_CONFIG.find(b => b.id === bId);
+        if (badgeCfg && !playerBadgesEarned[pId][bId]) {
+          // Check if prerequisites are met
+          const prereqsMet = badgeCfg.previousBadges.every(prevId => !!playerBadgesEarned[pId][prevId]);
+          if (badgeCfg.previousBadges.length === 0 || prereqsMet) {
+            if (playerBadgeContribCount[pId][bId] >= badgeCfg.reqCheckins) {
+              playerBadgesEarned[pId][bId] = {
+                dayEarned: c.day,
+                contribsAtEarn: playerTotalContribs[pId]
+              };
+            }
+          }
+        }
+      });
+
+      // 2. Compute t0(p, b) and Achievability for every player and badge
+      const playerBadgeT0 = {}; // { playerId: { badgeId: t0Day | null } }
+      const playerBadgeAchievable = {}; // { playerId: { badgeId: boolean } }
+
+      state.players.forEach(p => {
+        playerBadgeT0[p.id] = {};
+        playerBadgeAchievable[p.id] = {};
+
+        BADGES_CONFIG.forEach(b => {
+          if (b.previousBadges.length === 0) {
+            // Root badge is achievable from day 1
+            playerBadgeAchievable[p.id][b.id] = true;
+            playerBadgeT0[p.id][b.id] = p.joinDay;
+          } else {
+            // Achievable once all previousBadges are earned
+            const allPrereqsEarned = b.previousBadges.every(prevId => !!playerBadgesEarned[p.id][prevId]);
+            if (allPrereqsEarned) {
+              playerBadgeAchievable[p.id][b.id] = true;
+              // t0 is max dayEarned among previous badges
+              let maxDay = p.joinDay;
+              b.previousBadges.forEach(prevId => {
+                const earnInfo = playerBadgesEarned[p.id][prevId];
+                if (earnInfo && earnInfo.dayEarned > maxDay) {
+                  maxDay = earnInfo.dayEarned;
+                }
+              });
+              playerBadgeT0[p.id][b.id] = maxDay;
+            } else {
+              playerBadgeAchievable[p.id][b.id] = false;
+              playerBadgeT0[p.id][b.id] = null;
+            }
+          }
+        });
+      });
+
+      // 3. Compute Individual Interest Indicator i3(p, b) [Definition 3.2]
+      const playerBadgeI3 = {}; // { playerId: { badgeId: number } }
+      state.players.forEach(p => {
+        playerBadgeI3[p.id] = {};
+        BADGES_CONFIG.forEach(b => {
+          const isAchievable = playerBadgeAchievable[p.id][b.id];
+          const hasEarned = !!playerBadgesEarned[p.id][b.id];
+
+          if (!isAchievable) {
+            playerBadgeI3[p.id][b.id] = 1.0; // Definition 3.2: 1 if not achievable
+          } else {
+            const t0 = playerBadgeT0[p.id][b.id];
+            // If already earned, time taken is (dayEarned - t0); if in progress, elapsed is (currentDay - t0)
+            const elapsed = hasEarned 
+              ? Math.max(1, playerBadgesEarned[p.id][b.id].dayEarned - t0)
+              : Math.max(1, currentDay - t0);
+            playerBadgeI3[p.id][b.id] = 1.0 / elapsed;
+          }
+        });
+      });
+
+      // 4. Compute Badge Level Metrics: ET_b, ep(b), CII(b) [Definitions 3.1 & 3.3]
+      const badgeMetrics = {};
+      BADGES_CONFIG.forEach(b => {
+        // U_b: Players who have earned b
+        const Ub = state.players.filter(p => !!playerBadgesEarned[p.id][b.id]);
+        
+        // ET_b: Average contributions at award time
+        let ET_b = 0;
+        if (Ub.length > 0) {
+          const sumContribs = Ub.reduce((acc, p) => acc + playerBadgesEarned[p.id][b.id].contribsAtEarn, 0);
+          ET_b = sumContribs / Ub.length;
+        } else {
+          // Fallback estimate: sum of checkins of this badge + direct prerequisites
+          let fallback = b.reqCheckins;
+          b.previousBadges.forEach(prevId => {
+            const prevBadge = BADGES_CONFIG.find(x => x.id === prevId);
+            if (prevBadge) fallback += prevBadge.reqCheckins;
+          });
+          ET_b = fallback;
+        }
+
+        // ep(b): Eligible players who can achieve b and have not yet earned it
+        const ep = state.players.filter(p => playerBadgeAchievable[p.id][b.id] && !playerBadgesEarned[p.id][b.id]);
+
+        // CII(b): Median of i3(p, b) for p in ep(b)
+        let CII = null;
+        if (ep.length > 0) {
+          const i3Values = ep.map(p => playerBadgeI3[p.id][b.id]).sort((a, b) => a - b);
+          const mid = Math.floor(i3Values.length / 2);
+          const medianVal = (i3Values.length % 2 !== 0) ? i3Values[mid] : (i3Values[mid - 1] + i3Values[mid]) / 2.0;
+          CII = parseFloat(medianVal.toFixed(4));
+        } else {
+          CII = null; // No eligible pool active
+        }
+
+        badgeMetrics[b.id] = {
+          earnedCount: Ub.length,
+          earnedUsers: Ub.map(p => p.id),
+          ET_b: parseFloat(ET_b.toFixed(2)),
+          eligibleCount: ep.length,
+          eligibleUsers: ep.map(p => p.id),
+          CII: CII,
+          status: getEffectiveBadgeStatus(b.id, currentDay)
+        };
+      });
+
+      // 5. Compute PMI(p), relPMI(p), and CMI [Definitions 3.4 & 3.5]
+      const playerPMI = {};
+      const playerRelPMI = {};
+      let totalPMI = 0;
+
+      state.players.forEach(p => {
+        let pmiCount = 0;
+        // Evaluate for all available periods s
+        for (let s = 1; s <= currentPeriod; s++) {
+          const currC = playerContribsPerPeriod[p.id][s] || 0;
+          const prevC = s > 1 ? (playerContribsPerPeriod[p.id][s - 1] || 0) : 0;
+
+          // Non-zero condition
+          if (currC + prevC !== 0) {
+            if (currC >= prevC) {
+              pmiCount++;
+            }
+          }
+        }
+        playerPMI[p.id] = pmiCount;
+        totalPMI += pmiCount;
+      });
+
+      const avgPMI = state.players.length > 0 ? (totalPMI / state.players.length) : 0;
+
+      state.players.forEach(p => {
+        if (avgPMI > 0) {
+          playerRelPMI[p.id] = parseFloat((playerPMI[p.id] / avgPMI).toFixed(3));
+        } else {
+          // If total community PMI is 0, everyone is at baseline 0.00
+          playerRelPMI[p.id] = playerPMI[p.id] > 0 ? 1.0 : 0.0;
+        }
+      });
+
+      // CMI = median({ relPMI(p) : p in P })
+      const relPMIValues = state.players.map(p => playerRelPMI[p.id]).sort((a, b) => a - b);
+      const mid = Math.floor(relPMIValues.length / 2);
+      const CMI = (relPMIValues.length % 2 !== 0)
+        ? relPMIValues[mid]
+        : parseFloat(((relPMIValues[mid - 1] + relPMIValues[mid]) / 2.0).toFixed(3));
+
+      return {
+        currentDay,
+        currentPeriod,
+        playerBadgesEarned,
+        playerBadgeContribCount,
+        playerTotalContribs,
+        playerContribsPerPeriod,
+        playerBadgeT0,
+        playerBadgeAchievable,
+        playerBadgeI3,
+        badgeMetrics,
+        playerPMI,
+        playerRelPMI,
+        avgPMI: parseFloat(avgPMI.toFixed(2)),
+        CMI: isNaN(CMI) ? 0.0 : CMI
+      };
+    }
+
+    // ==========================================
+    // 4. RENDERING & UI SYNC
+    // ==========================================
+    let computedData = null;
+
+    function refreshAllUI() {
+      computedData = computeGamificationState();
+
+      // Sync form day with current simulation day
+      const formDayInput = document.getElementById('form-day-input');
+      if (formDayInput) {
+        formDayInput.value = state.currentDay;
+      }
+      updateFormPeriodIndicator();
+
+      renderHeaderMetrics();
+      renderPlayersList();
+      renderCollabsLog();
+      renderGraphSVG();
+      renderBadgeRankingTable();
+      renderPeriodMatrix();
+      renderHeuristicPipeline();
+      renderManualFadeSelect();
+      if (state.selectedPlayerId) {
+        renderPlayerDetail(state.selectedPlayerId);
+      }
+
+      // Re-initialize Lucide icons
+      lucide.createIcons();
+    }
+
+    function updateFormPeriodIndicator() {
+      const inputDay = parseInt(document.getElementById('form-day-input').value || state.currentDay, 10);
+      const targetPeriod = Math.max(1, Math.ceil(inputDay / state.daysPerPeriod));
+      const ind = document.getElementById('form-period-indicator');
+      if (ind) {
+        ind.textContent = `Period ${targetPeriod} (Day ${inputDay})`;
+      }
+    }
+
+    function renderHeaderMetrics() {
+      const { currentDay, currentPeriod, CMI, avgPMI, badgeMetrics, playerTotalContribs, playerPMI } = computedData;
+
+      document.getElementById('current-day-label').textContent = `Day ${currentDay} (Period ${currentPeriod})`;
+      document.getElementById('metric-cmi-val').textContent = CMI.toFixed(2);
+      document.getElementById('metric-avg-pmi').textContent = avgPMI.toFixed(2);
+
+      const pmiArr = Object.values(playerPMI);
+      document.getElementById('metric-max-pmi').textContent = pmiArr.length ? Math.max(...pmiArr) : 0;
+      document.getElementById('metric-min-pmi').textContent = pmiArr.length ? Math.min(...pmiArr) : 0;
+
+      const totalContribs = state.collaborations.filter(c => c.day <= currentDay).length;
+      document.getElementById('metric-total-contribs').textContent = totalContribs;
+
+      const activePlayers = Object.values(playerTotalContribs).filter(c => c > 0).length;
+      document.getElementById('metric-active-players').textContent = activePlayers;
+
+      let totalEarnedBadges = 0;
+      let fadingCount = 0;
+      let expiredCount = 0;
+      let lowestCII = 999;
+      let lowestCIIBadge = 'None';
+
+      BADGES_CONFIG.forEach(b => {
+        const m = badgeMetrics[b.id];
+        totalEarnedBadges += m.earnedCount;
+        if (m.status === 'faded') fadingCount++;
+        if (m.status === 'expired') expiredCount++;
+        if (m.eligibleCount > 0 && m.CII !== null && m.CII < lowestCII) {
+          lowestCII = m.CII;
+          lowestCIIBadge = b.name;
+        }
+      });
+
+      document.getElementById('metric-total-badges-awarded').textContent = totalEarnedBadges;
+      document.getElementById('metric-fading-count').textContent = fadingCount;
+      document.getElementById('metric-expired-count').textContent = expiredCount;
+      document.getElementById('metric-lowest-cii-badge').textContent = lowestCIIBadge;
+
+      // CMI status & trigger badge
+      const cmiBadge = document.getElementById('metric-cmi-badge');
+      const statusDot = document.getElementById('status-dot');
+      const statusText = document.getElementById('status-text');
+
+      if (CMI < state.cmiThreshold) {
+        cmiBadge.className = 'text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-rose-950 text-rose-400 border border-rose-800 animate-pulse';
+        cmiBadge.textContent = 'Trigger Alert!';
+        statusDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping';
+        statusText.className = 'text-rose-400 uppercase tracking-wide text-xs';
+        statusText.textContent = 'ADAPTATION ACTIVE';
+      } else {
+        cmiBadge.className = 'text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800';
+        cmiBadge.textContent = 'Healthy';
+        statusDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+        statusText.className = 'text-emerald-400 uppercase tracking-wide text-xs';
+        statusText.textContent = 'IDLE (OK)';
+      }
+    }
+
+    function renderPlayersList() {
+      const container = document.getElementById('players-list-container');
+      const { playerTotalContribs, playerPMI, playerRelPMI, playerBadgesEarned } = computedData;
+
+      let list = [...state.players];
+
+      // Filter
+      if (state.searchTerm) {
+        list = list.filter(p => p.name.toLowerCase().includes(state.searchTerm.toLowerCase()) || p.id.toLowerCase().includes(state.searchTerm.toLowerCase()));
+      }
+
+      // Sort
+      if (state.sortBy === 'pmi') {
+        list.sort((a, b) => (playerPMI[b.id] ?? 0) - (playerPMI[a.id] ?? 0));
+      } else if (state.sortBy === 'relPMI') {
+        list.sort((a, b) => (playerRelPMI[b.id] ?? 0) - (playerRelPMI[a.id] ?? 0));
+      } else if (state.sortBy === 'contribs') {
+        list.sort((a, b) => (playerTotalContribs[b.id] ?? 0) - (playerTotalContribs[a.id] ?? 0));
+      } else if (state.sortBy === 'badges') {
+        list.sort((a, b) => Object.keys(playerBadgesEarned[b.id] || {}).length - Object.keys(playerBadgesEarned[a.id] || {}).length);
+      }
+
+      container.innerHTML = list.map(p => {
+        const contribs = playerTotalContribs[p.id] ?? 0;
+        const pmi = playerPMI[p.id] ?? 0;
+        const rel = playerRelPMI[p.id] !== undefined ? playerRelPMI[p.id] : 0.0;
+        const badgesCount = Object.keys(playerBadgesEarned[p.id] || {}).length;
+        const isSelected = state.selectedPlayerId === p.id;
+
+        return `
+          <div onclick="selectPlayer('${p.id}')" class="p-2.5 px-3 flex items-center justify-between cursor-pointer transition ${isSelected ? 'bg-indigo-950/60 border-l-2 border-indigo-500' : 'hover:bg-slate-900/60'}">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-indigo-300">
+                ${p.name.substring(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <div class="font-semibold text-xs text-slate-200">${p.name}</div>
+                <div class="text-[10px] text-slate-500 font-mono">${contribs} contribs • ${badgesCount} 🏅</div>
+              </div>
+            </div>
+            <div class="text-right font-mono text-xs">
+              <div class="font-bold ${rel >= 1.0 ? 'text-emerald-400' : (rel > 0 ? 'text-amber-400' : 'text-slate-500')}">rel: ${rel.toFixed(2)}</div>
+              <div class="text-[10px] text-slate-500">PMI: ${pmi}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectPlayer(playerId) {
+      state.selectedPlayerId = playerId;
+      const playerSelect = document.getElementById('form-player-select');
+      if (playerSelect) playerSelect.value = playerId;
+
+      renderPlayersList();
+      renderPlayerDetail(playerId);
+    }
+
+    function closePlayerDetail() {
+      state.selectedPlayerId = null;
+      document.getElementById('player-detail-drawer').classList.add('hidden');
+      renderPlayersList();
+    }
+
+    function renderPlayerDetail(playerId) {
+      const drawer = document.getElementById('player-detail-drawer');
+      drawer.classList.remove('hidden');
+
+      const p = state.players.find(x => x.id === playerId);
+      if (!p) return;
+
+      const { playerTotalContribs, playerPMI, playerRelPMI, playerBadgeAchievable, playerBadgeI3, playerBadgeT0, playerBadgesEarned } = computedData;
+
+      document.getElementById('detail-player-avatar').textContent = p.name.substring(0, 2).toUpperCase();
+      document.getElementById('detail-player-name').textContent = p.name;
+      document.getElementById('detail-player-pmi').textContent = playerPMI[playerId] ?? 0;
+      document.getElementById('detail-player-relpmi').textContent = (playerRelPMI[playerId] !== undefined ? playerRelPMI[playerId] : 0.0).toFixed(2);
+      document.getElementById('detail-player-contribs').textContent = playerTotalContribs[playerId] ?? 0;
+
+      const btnQuickAdd = document.getElementById('btn-quick-add-for-player');
+      btnQuickAdd.onclick = () => {
+        document.getElementById('tab-btn-add').click();
+        document.getElementById('form-player-select').value = playerId;
+        document.getElementById('form-day-input').value = state.currentDay;
+        updateFormPeriodIndicator();
+      };
+
+      const i3Container = document.getElementById('detail-player-i3-list');
+      const achievableBadges = BADGES_CONFIG.filter(b => playerBadgeAchievable[playerId][b.id]);
+
+      if (achievableBadges.length === 0) {
+        i3Container.innerHTML = `<div class="text-slate-500 text-[10px]">No achievable badges yet.</div>`;
+      } else {
+        i3Container.innerHTML = achievableBadges.map(b => {
+          const isEarned = !!playerBadgesEarned[playerId][b.id];
+          const i3 = playerBadgeI3[playerId][b.id];
+          const t0 = playerBadgeT0[playerId][b.id];
+          return `
+            <div class="flex items-center justify-between bg-slate-950 p-1.5 rounded border border-slate-800/80">
+              <span class="text-slate-300 truncate max-w-[140px]">${b.icon} ${b.name}</span>
+              <div class="flex items-center gap-2 font-mono text-[10px]">
+                <span class="text-slate-500">t0: D${t0}</span>
+                ${isEarned 
+                  ? `<span class="text-emerald-400 font-bold">Earned</span>` 
+                  : `<span class="text-indigo-300 font-bold">i3: ${i3.toFixed(3)}</span>`}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    function renderCollabsLog() {
+      const container = document.getElementById('collabs-log-container');
+      if (!container) return;
+
+      const list = [...state.collaborations].sort((a, b) => b.day - a.day || b.timestamp - a.timestamp);
+      if (list.length === 0) {
+        container.innerHTML = `<div class="text-slate-500 text-center py-4">No collaborations registered.</div>`;
+        return;
+      }
+
+      container.innerHTML = list.slice(0, 30).map(c => {
+        const p = state.players.find(x => x.id === c.playerId);
+        const b = BADGES_CONFIG.find(x => x.id === c.badgeId);
+        const pName = p ? p.name : c.playerId;
+        const bName = b ? `${b.icon} ${b.name}` : c.badgeId;
+        const period = Math.max(1, Math.ceil(c.day / state.daysPerPeriod));
+
+        return `
+          <div class="flex items-center justify-between p-1.5 bg-slate-950 rounded border border-slate-800">
+            <div>
+              <span class="text-indigo-300 font-semibold">${pName}</span>
+              <span class="text-slate-400">&rarr; ${bName}</span>
+              <span class="text-slate-500 text-[10px] ml-1.5">(Day ${c.day} • P${period})</span>
+            </div>
+            <button onclick="deleteCollaboration('${c.id}')" class="text-rose-400 hover:text-rose-300 px-1 text-[10px]" title="Delete collaboration">
+              &times;
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function deleteCollaboration(collabId) {
+      state.collaborations = state.collaborations.filter(c => c.id !== collabId);
+      refreshAllUI();
+    }
+
+    // ==========================================
+    // 5. SVG BADGE GRAPH RENDERING (Figure 1)
+    // ==========================================
+
+    function renderGraphSVG() {
+      const linksLayer = document.getElementById('svg-links-layer');
+      const nodesLayer = document.getElementById('svg-nodes-layer');
+      const { badgeMetrics } = computedData;
+
+      linksLayer.innerHTML = '';
+      nodesLayer.innerHTML = '';
+
+      // 1. Draw Links
+      BADGES_CONFIG.forEach(target => {
+        target.previousBadges.forEach(prevId => {
+          const source = BADGES_CONFIG.find(b => b.id === prevId);
+          if (source) {
+            const targetStatus = badgeMetrics[target.id].status;
+            let strokeColor = '#334155';
+            let marker = 'url(#arrowhead)';
+
+            if (targetStatus === 'faded') {
+              strokeColor = '#f59e0b';
+              marker = 'url(#arrowhead-warning)';
+            } else if (targetStatus === 'active') {
+              strokeColor = '#475569';
+              marker = 'url(#arrowhead)';
+            }
+
+            const x1 = source.x;
+            const y1 = source.y + 52;
+            const x2 = target.x;
+            const y2 = target.y - 3;
+
+            const dy = Math.max(20, (y2 - y1) * 0.5);
+            const path = `M ${x1} ${y1} C ${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
+
+            const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            pathEl.setAttribute('d', path);
+            pathEl.setAttribute('fill', 'none');
+            pathEl.setAttribute('stroke', strokeColor);
+            pathEl.setAttribute('stroke-width', '1.8');
+            pathEl.setAttribute('stroke-dasharray', targetStatus === 'faded' ? '4 2' : 'none');
+            pathEl.setAttribute('marker-end', marker);
+            linksLayer.appendChild(pathEl);
+          }
+        });
+      });
+
+      // 2. Draw Nodes
+      BADGES_CONFIG.forEach(badge => {
+        const m = badgeMetrics[badge.id];
+        const status = m.status;
+        const isSelected = state.selectedBadgeId === badge.id;
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('transform', `translate(${badge.x - 75}, ${badge.y})`);
+        g.setAttribute('class', 'cursor-pointer group');
+        g.onclick = () => selectBadge(badge.id);
+
+        let strokeColor = '#334155';
+        let fillColor = '#090d16';
+        let pulseClass = '';
+
+        if (status === 'faded') {
+          strokeColor = '#f59e0b';
+          fillColor = '#1c1306';
+          pulseClass = 'badge-fading-pulse';
+        } else if (status === 'expired') {
+          strokeColor = '#ef4444';
+          fillColor = '#1a0d0d';
+        } else if (m.earnedCount > 0) {
+          strokeColor = '#10b981';
+        }
+
+        if (isSelected) {
+          strokeColor = '#6366f1';
+        }
+
+        // Card Rectangle
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('width', '150');
+        rect.setAttribute('height', '52');
+        rect.setAttribute('rx', '10');
+        rect.setAttribute('fill', fillColor);
+        rect.setAttribute('stroke', strokeColor);
+        rect.setAttribute('stroke-width', isSelected || status === 'faded' ? '2.5' : '1.5');
+        if (status === 'faded') rect.setAttribute('class', pulseClass);
+        g.appendChild(rect);
+
+        // Icon + Name
+        const titleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        titleText.setAttribute('x', '10');
+        titleText.setAttribute('y', '22');
+        titleText.setAttribute('fill', '#f1f5f9');
+        titleText.setAttribute('font-size', '11');
+        titleText.setAttribute('font-weight', 'bold');
+        titleText.textContent = `${badge.icon} ${badge.name.substring(0, 15)}`;
+        g.appendChild(titleText);
+
+        // Subtitle: CII & Earned Stats
+        const subText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        subText.setAttribute('x', '10');
+        subText.setAttribute('y', '38');
+        subText.setAttribute('fill', '#94a3b8');
+        subText.setAttribute('font-size', '9');
+        subText.setAttribute('font-family', 'monospace');
+        const ciiStr = m.CII !== null ? m.CII.toFixed(2) : 'N/A';
+        subText.textContent = `CII: ${ciiStr} | 🏅 ${m.earnedCount}/20`;
+        g.appendChild(subText);
+
+        // Fading Countdown Badge if fading
+        if (status === 'faded') {
+          const fadeTag = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          fadeTag.setAttribute('x', '95');
+          fadeTag.setAttribute('y', '-6');
+          fadeTag.setAttribute('width', '50');
+          fadeTag.setAttribute('height', '14');
+          fadeTag.setAttribute('rx', '4');
+          fadeTag.setAttribute('fill', '#f59e0b');
+          g.appendChild(fadeTag);
+
+          const fadeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          fadeText.setAttribute('x', '120');
+          fadeText.setAttribute('y', '4');
+          fadeText.setAttribute('text-anchor', 'middle');
+          fadeText.setAttribute('fill', '#000');
+          fadeText.setAttribute('font-size', '8');
+          fadeText.setAttribute('font-weight', 'bold');
+          fadeText.textContent = 'FADING!';
+          g.appendChild(fadeText);
+        }
+
+        nodesLayer.appendChild(g);
+      });
+    }
+
+    function selectBadge(badgeId) {
+      state.selectedBadgeId = badgeId;
+      const formBadgeSelect = document.getElementById('form-badge-select');
+      if (formBadgeSelect) formBadgeSelect.value = badgeId;
+
+      renderGraphSVG();
+      showFormulaModal('cii', badgeId);
+    }
+
+    // ==========================================
+    // 6. BADGE RANKING & HEURISTIC SUMMARY TABLE
+    // ==========================================
+
+    function renderBadgeRankingTable() {
+      const tbody = document.getElementById('badge-ranking-tbody');
+      const { badgeMetrics } = computedData;
+
+      // Sort badges by CII ascending (§4.2.2) (badges with valid CII first)
+      const sortedBadges = [...BADGES_CONFIG].sort((a, b) => {
+        const ciiA = badgeMetrics[a.id].CII;
+        const ciiB = badgeMetrics[b.id].CII;
+        if (ciiA !== null && ciiB !== null) return ciiA - ciiB;
+        if (ciiA !== null && ciiB === null) return -1;
+        if (ciiA === null && ciiB !== null) return 1;
+        return 0;
+      });
+
+      tbody.innerHTML = sortedBadges.map(b => {
+        const m = badgeMetrics[b.id];
+        let statusBadge = `<span class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">Active</span>`;
+        if (m.status === 'faded') {
+          const daysLeft = Math.max(0, (state.badgeStatusOverride[b.id]?.expiresAtDay ?? 0) - state.currentDay);
+          statusBadge = `<span class="px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 animate-pulse font-bold">Fading (${daysLeft}d left)</span>`;
+        } else if (m.status === 'expired') {
+          statusBadge = `<span class="px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800 font-bold">Expired</span>`;
+        }
+
+        const prereqsText = b.previousBadges.length > 0 
+          ? b.previousBadges.map(p => BADGES_CONFIG.find(x => x.id === p)?.name).join(', ')
+          : '<span class="text-slate-500">None (Initial)</span>';
+
+        const ciiDisplay = m.CII !== null 
+          ? `<span class="${m.CII < 0.1 && m.eligibleCount > 0 ? 'text-amber-400 font-bold' : 'text-slate-200'}">${m.CII.toFixed(4)}</span>`
+          : `<span class="text-slate-500">N/A (0 eligible)</span>`;
+
+        return `
+          <tr class="hover:bg-slate-900/60 transition">
+            <td class="py-2 text-slate-200 font-semibold flex items-center gap-1.5 cursor-pointer" onclick="selectBadge('${b.id}')">
+              <span>${b.icon}</span> <span class="hover:underline">${b.name}</span>
+            </td>
+            <td class="py-2 text-slate-400 text-[10px]">${prereqsText}</td>
+            <td class="py-2 text-center text-slate-300">${b.reqCheckins}</td>
+            <td class="py-2 text-center font-bold ${m.earnedCount > 0 ? 'text-emerald-400' : 'text-slate-500'}">${m.earnedCount}/20</td>
+            <td class="py-2 text-center text-indigo-300 font-mono">${m.ET_b}</td>
+            <td class="py-2 text-center text-slate-300">${m.eligibleCount}</td>
+            <td class="py-2 text-center font-mono">${ciiDisplay}</td>
+            <td class="py-2 text-center">${statusBadge}</td>
+            <td class="py-2 text-right space-x-1">
+              <button onclick="showFormulaModal('cii', '${b.id}')" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]" title="Inspect CII Formula">
+                Inspect
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // 7. PERIOD CONTRIBUTIONS MATRIX [cnum(p, s)]
+    // ==========================================
+
+    function renderPeriodMatrix() {
+      const thead = document.getElementById('matrix-thead');
+      const tbody = document.getElementById('matrix-tbody');
+      const { currentPeriod, playerContribsPerPeriod, playerPMI, playerRelPMI } = computedData;
+
+      // Build Dynamic Header
+      let headHtml = `<tr><th class="p-2">Player</th>`;
+      for (let s = 1; s <= currentPeriod; s++) {
+        headHtml += `<th class="p-2 text-center">Period ${s} (D${(s-1)*state.daysPerPeriod + 1}-D${s*state.daysPerPeriod})</th>`;
+      }
+      headHtml += `<th class="p-2 text-center text-indigo-400 font-bold">PMI(p)</th>`;
+      headHtml += `<th class="p-2 text-center text-emerald-400 font-bold">relPMI(p)</th></tr>`;
+      thead.innerHTML = headHtml;
+
+      // Build Rows
+      tbody.innerHTML = state.players.map(p => {
+        let rowHtml = `<tr class="hover:bg-slate-900/60"><td class="p-2 font-semibold text-slate-200 cursor-pointer" onclick="selectPlayer('${p.id}')">${p.name}</td>`;
+
+        for (let s = 1; s <= currentPeriod; s++) {
+          const currC = playerContribsPerPeriod[p.id][s] || 0;
+          const prevC = s > 1 ? (playerContribsPerPeriod[p.id][s - 1] || 0) : 0;
+
+          let badgeClass = 'text-slate-500';
+          let symbol = '';
+
+          if (currC + prevC === 0) {
+            badgeClass = 'text-slate-600 bg-slate-950/40';
+            symbol = '-';
+          } else if (currC >= prevC) {
+            badgeClass = 'text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 font-bold';
+            symbol = '↑';
+          } else {
+            badgeClass = 'text-rose-400 bg-rose-950/40 border border-rose-800/40 font-bold';
+            symbol = '↓';
+          }
+
+          const targetDay = (s - 1) * state.daysPerPeriod + 1;
+
+          rowHtml += `
+            <td class="p-2 text-center">
+              <span onclick="quickAddForCell('${p.id}', ${targetDay})" class="inline-block px-2 py-0.5 rounded text-[10px] ${badgeClass} cursor-pointer hover:ring-1 hover:ring-indigo-400" title="Click to add contribution in Period ${s} (Day ${targetDay})">
+                ${currC} ${symbol}
+              </span>
+            </td>
+          `;
+        }
+
+        const pmi = playerPMI[p.id] ?? 0;
+        const rel = playerRelPMI[p.id] !== undefined ? playerRelPMI[p.id] : 0.0;
+
+        rowHtml += `
+          <td class="p-2 text-center font-bold text-indigo-300">${pmi}</td>
+          <td class="p-2 text-center font-bold ${rel >= 1.0 ? 'text-emerald-400' : (rel > 0 ? 'text-amber-400' : 'text-slate-500')}">${rel.toFixed(2)}</td>
+        </tr>`;
+
+        return rowHtml;
+      }).join('');
+    }
+
+    function quickAddForCell(playerId, targetDay) {
+      document.getElementById('tab-btn-add').click();
+      document.getElementById('form-player-select').value = playerId;
+      document.getElementById('form-day-input').value = targetDay;
+      updateFormPeriodIndicator();
+    }
+
+    // ==========================================
+    // 8. HEURISTIC PIPELINE & ADAPTATION EXECUTION (§4)
+    // ==========================================
+
+    function renderHeuristicPipeline() {
+      const { CMI, badgeMetrics } = computedData;
+
+      document.getElementById('pipe-cmi-val').textContent = CMI.toFixed(2);
+
+      // Step 1 Trigger Check
+      const step1Badge = document.getElementById('pipe-step1-badge');
+      const step1Detail = document.getElementById('pipe-step1-detail');
+      if (CMI < state.cmiThreshold) {
+        step1Badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-mono bg-rose-950 text-rose-300 border border-rose-800';
+        step1Badge.textContent = 'TRIGGERED';
+        step1Detail.innerHTML = `<span class="text-rose-400 font-bold">Alert!</span> CMI (${CMI.toFixed(2)}) &lt; threshold (${state.cmiThreshold}). Adaptation is needed to reignite engagement.`;
+      } else {
+        step1Badge.className = 'px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800';
+        step1Badge.textContent = 'OK';
+        step1Detail.innerHTML = `CMI (${CMI.toFixed(2)}) &ge; threshold (${state.cmiThreshold}). Community motivation is healthy.`;
+      }
+
+      // Step 2 Candidate Filtering (§4.2.1)
+      const allPlayerBadges = BADGES_CONFIG.filter(b => badgeMetrics[b.id].earnedCount === state.players.length);
+      const unreachableBadges = BADGES_CONFIG.filter(b => badgeMetrics[b.id].earnedCount === 0 && badgeMetrics[b.id].eligibleCount === 0);
+      const filteredCandidates = BADGES_CONFIG.filter(b => {
+        const m = badgeMetrics[b.id];
+        return m.earnedCount < state.players.length && m.eligibleCount > 0 && m.status === 'active';
+      });
+
+      document.getElementById('pipe-step2-detail').innerHTML = `
+        Candidates: <span class="text-emerald-400 font-bold">${filteredCandidates.length}</span><br>
+        Filtered earned-by-all: ${allPlayerBadges.length}<br>
+        Filtered unreachable: ${unreachableBadges.length}
+      `;
+
+      // Step 3 Candidate Ranking by CII (§4.2.2)
+      const sortedCandidates = [...filteredCandidates].sort((a, b) => {
+        const ciiA = badgeMetrics[a.id].CII ?? 999;
+        const ciiB = badgeMetrics[b.id].CII ?? 999;
+        return ciiA - ciiB;
+      });
+      const topCandidate = sortedCandidates.length > 0 ? sortedCandidates[0] : null;
+
+      if (topCandidate) {
+        const ciiScore = badgeMetrics[topCandidate.id].CII !== null ? badgeMetrics[topCandidate.id].CII.toFixed(4) : 'N/A';
+        document.getElementById('pipe-step3-detail').innerHTML = `
+          Top Candidate: <span class="text-amber-400 font-bold">${topCandidate.icon} ${topCandidate.name}</span><br>
+          CII: <span class="font-bold">${ciiScore}</span> (Lowest Interest)
+        `;
+        document.getElementById('pipe-step4-detail').innerHTML = `
+          Calculated ET_b: <span class="text-indigo-400 font-bold">${badgeMetrics[topCandidate.id].ET_b} days/contribs</span><br>
+          Expiry Deadline: Day ${state.currentDay + Math.ceil(badgeMetrics[topCandidate.id].ET_b)}
+        `;
+      } else {
+        document.getElementById('pipe-step3-detail').innerHTML = `No candidate available for removal.`;
+        document.getElementById('pipe-step4-detail').innerHTML = `N/A`;
+      }
+    }
+
+    function renderManualFadeSelect() {
+      const select = document.getElementById('select-manual-fade-badge');
+      const formBadgeSelect = document.getElementById('form-badge-select');
+      const formPlayerSelect = document.getElementById('form-player-select');
+
+      const prevSelectVal = select.value;
+      const prevBadgeVal = formBadgeSelect.value;
+      const prevPlayerVal = formPlayerSelect.value;
+
+      select.innerHTML = BADGES_CONFIG.map(b => `<option value="${b.id}">${b.icon} ${b.name}</option>`).join('');
+      formBadgeSelect.innerHTML = BADGES_CONFIG.map(b => `<option value="${b.id}">${b.icon} ${b.name} (${b.reqCheckins} checkins)</option>`).join('');
+      formPlayerSelect.innerHTML = state.players.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+      if (prevSelectVal) select.value = prevSelectVal;
+      if (prevBadgeVal) formBadgeSelect.value = prevBadgeVal;
+      if (prevPlayerVal) formPlayerSelect.value = prevPlayerVal;
+    }
+
+    // ==========================================
+    // 9. EVENT HANDLERS & SIMULATION PRESETS
+    // ==========================================
+
+    // Advance clock
+    document.getElementById('btn-next-day').onclick = () => {
+      state.currentDay += 1;
+      refreshAllUI();
+    };
+
+    document.getElementById('btn-next-period').onclick = () => {
+      state.currentDay += state.daysPerPeriod;
+      refreshAllUI();
+    };
+
+    document.getElementById('btn-reset').onclick = () => {
+      state.currentDay = 1;
+      state.collaborations = [];
+      state.badgeStatusOverride = {};
+      state.selectedPlayerId = null;
+      state.selectedBadgeId = null;
+      refreshAllUI();
+    };
+
+    // Sync button on form
+    document.getElementById('btn-sync-form-day').onclick = () => {
+      document.getElementById('form-day-input').value = state.currentDay;
+      updateFormPeriodIndicator();
+    };
+
+    document.getElementById('form-day-input').oninput = updateFormPeriodIndicator;
+
+    // Tab switcher Left Panel
+    document.getElementById('tab-btn-players').onclick = () => {
+      document.getElementById('tab-content-players').classList.remove('hidden');
+      document.getElementById('tab-content-add').classList.add('hidden');
+      document.getElementById('tab-content-log').classList.add('hidden');
+      document.getElementById('tab-btn-players').className = 'px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium';
+      document.getElementById('tab-btn-add').className = 'px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-medium';
+      document.getElementById('tab-btn-log').className = 'px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-medium';
+    };
+
+    document.getElementById('tab-btn-add').onclick = () => {
+      document.getElementById('tab-content-players').classList.add('hidden');
+      document.getElementById('tab-content-add').classList.remove('hidden');
+      document.getElementById('tab-content-log').classList.add('hidden');
+      document.getElementById('tab-btn-add').className = 'px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium';
+      document.getElementById('tab-btn-players').className = 'px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-medium';
+      document.getElementById('tab-btn-log').className = 'px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-medium';
+      updateFormPeriodIndicator();
+    };
+
+    document.getElementById('tab-btn-log').onclick = () => {
+      document.getElementById('tab-content-players').classList.add('hidden');
+      document.getElementById('tab-content-add').classList.add('hidden');
+      document.getElementById('tab-content-log').classList.remove('hidden');
+      document.getElementById('tab-btn-log').className = 'px-2 py-1 bg-indigo-600 text-white rounded text-xs font-medium';
+      document.getElementById('tab-btn-players').className = 'px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-medium';
+      document.getElementById('tab-btn-add').className = 'px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs font-medium';
+      renderCollabsLog();
+    };
+
+    document.getElementById('btn-clear-collabs').onclick = () => {
+      if (confirm('Clear all collaboration history?')) {
+        state.collaborations = [];
+        refreshAllUI();
+      }
+    };
+
+    // Sub Tab switcher Center Panel
+    const viewTabs = ['graph', 'matrix', 'heuristics', 'formulas'];
+    viewTabs.forEach(tab => {
+      document.getElementById(`view-tab-${tab}`).onclick = () => {
+        viewTabs.forEach(t => {
+          document.getElementById(`panel-${t}-view`).classList.toggle('hidden', t !== tab);
+          const btn = document.getElementById(`view-tab-${t}`);
+          if (t === tab) {
+            btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white flex items-center gap-1.5 shadow';
+          } else {
+            btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5 border border-slate-700';
+          }
+        });
+      };
+    });
+
+    // Add single contribution form
+    document.getElementById('btn-submit-contrib').onclick = () => {
+      const playerId = document.getElementById('form-player-select').value;
+      const badgeId = document.getElementById('form-badge-select').value;
+      const day = parseInt(document.getElementById('form-day-input').value || state.currentDay, 10);
+      const qty = parseInt(document.getElementById('form-qty-input').value || 1, 10);
+
+      for (let i = 0; i < qty; i++) {
+        state.collaborations.push({
+          id: 'c_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          playerId,
+          badgeId,
+          day,
+          timestamp: Date.now() + i
+        });
+      }
+
+      if (day > state.currentDay) {
+        state.currentDay = day;
+      }
+
+      refreshAllUI();
+    };
+
+    // Search and Sort
+    document.getElementById('player-search').oninput = (e) => {
+      state.searchTerm = e.target.value;
+      renderPlayersList();
+    };
+
+    document.getElementById('player-sort').onchange = (e) => {
+      state.sortBy = e.target.value;
+      renderPlayersList();
+    };
+
+    // Manual Fading Application
+    document.getElementById('btn-apply-fade').onclick = () => {
+      const badgeId = document.getElementById('select-manual-fade-badge').value;
+      const duration = parseInt(document.getElementById('input-fade-duration').value, 10);
+
+      state.badgeStatusOverride[badgeId] = {
+        status: 'faded',
+        fadedSinceDay: state.currentDay,
+        expiresAtDay: state.currentDay + duration,
+        fadeReason: 'Low community interest detected via CII heuristic'
+      };
+
+      refreshAllUI();
+    };
+
+    // Run Heuristic Pipeline Automatically
+    document.getElementById('btn-run-heuristic').onclick = runHeuristicAuto;
+    document.getElementById('btn-pipeline-execute').onclick = runHeuristicAuto;
+
+    function runHeuristicAuto() {
+      const { badgeMetrics } = computedData;
+      
+      const filteredCandidates = BADGES_CONFIG.filter(b => {
+        const m = badgeMetrics[b.id];
+        return m.earnedCount < state.players.length && m.eligibleCount > 0 && m.status === 'active';
+      });
+
+      if (filteredCandidates.length === 0) {
+        alert('No eligible candidate badges found to apply the Vanishing Badge strategy.');
+        return;
+      }
+
+      const sorted = [...filteredCandidates].sort((a, b) => {
+        const ciiA = badgeMetrics[a.id].CII ?? 999;
+        const ciiB = badgeMetrics[b.id].CII ?? 999;
+        return ciiA - ciiB;
+      });
+      const selected = sorted[0];
+      const duration = Math.max(3, Math.ceil(badgeMetrics[selected.id].ET_b));
+
+      state.badgeStatusOverride[selected.id] = {
+        status: 'faded',
+        fadedSinceDay: state.currentDay,
+        expiresAtDay: state.currentDay + duration,
+        fadeReason: `Triggered adaptation (§4): CII score ${badgeMetrics[selected.id].CII !== null ? badgeMetrics[selected.id].CII.toFixed(4) : '0'} was the lowest in community`
+      };
+
+      refreshAllUI();
+      alert(`⚡ Vanishing Badge Adaptation Triggered!\n\nBadge "${selected.name}" has been marked as FADING for ${duration} days (Expires Day ${state.currentDay + duration}).\n\nCommunity members will now feel time pressure to earn it!`);
+    }
+
+    // Quick Simulation Generators
+    document.getElementById('btn-quick-random-active').onclick = () => {
+      const samplePlayers = [...state.players].sort(() => 0.5 - Math.random()).slice(0, 5);
+      samplePlayers.forEach(p => {
+        const randomBadge = BADGES_CONFIG[Math.floor(Math.random() * 3)];
+        state.collaborations.push({
+          id: 'c_' + Math.random(),
+          playerId: p.id,
+          badgeId: randomBadge.id,
+          day: state.currentDay,
+          timestamp: Date.now()
+        });
+      });
+      refreshAllUI();
+    };
+
+    document.getElementById('btn-quick-everyone-root').onclick = () => {
+      state.players.forEach(p => {
+        state.collaborations.push({
+          id: 'c_' + Math.random(),
+          playerId: p.id,
+          badgeId: 'primer_experimento',
+          day: state.currentDay,
+          timestamp: Date.now()
+        });
+      });
+      refreshAllUI();
+    };
+
+    document.getElementById('btn-quick-slump-day').onclick = () => {
+      state.currentDay += state.daysPerPeriod;
+      // Only 1 user makes a contribution in this new period -> dramatic slump!
+      state.collaborations.push({
+        id: 'c_' + Math.random(),
+        playerId: state.players[0].id,
+        badgeId: 'primer_experimento',
+        day: state.currentDay,
+        timestamp: Date.now()
+      });
+      refreshAllUI();
+    };
+
+    document.getElementById('btn-quick-rush-fading').onclick = () => {
+      // Find fading badge
+      const fadingBadgeId = Object.keys(state.badgeStatusOverride).find(id => getEffectiveBadgeStatus(id) === 'faded');
+      if (!fadingBadgeId) {
+        alert('No badge is currently in FADING status. Trigger the heuristic or mark one as fading first!');
+        return;
+      }
+
+      // 8 players contribute to the fading badge
+      state.players.slice(0, 8).forEach(p => {
+        for (let i = 0; i < 4; i++) {
+          state.collaborations.push({
+            id: 'c_' + Math.random(),
+            playerId: p.id,
+            badgeId: fadingBadgeId,
+            day: state.currentDay,
+            timestamp: Date.now() + i
+          });
+        }
+      });
+      refreshAllUI();
+      alert(`🏃 Rush simulation executed! 8 players contributed to ${fadingBadgeId} before deadline.`);
+    };
+
+    // Scenario Presets
+    document.getElementById('preset-scenario-select').onchange = (e) => {
+      const val = e.target.value;
+      if (val === 'empty') {
+        state.currentDay = 1;
+        state.collaborations = [];
+        state.badgeStatusOverride = {};
+        refreshAllUI();
+      } else if (val === 'healthy') {
+        loadHealthyCommunityPreset();
+      } else if (val === 'slump') {
+        loadMotivationSlumpPreset();
+      } else if (val === 'bottleneck') {
+        loadBottleneckPreset();
+      }
+      e.target.value = '';
+    };
+
+    function loadHealthyCommunityPreset() {
+      state.currentDay = 10;
+      state.collaborations = [];
+      state.badgeStatusOverride = {};
+
+      // 3 periods with escalating activity
+      for (let s = 1; s <= 3; s++) {
+        const day = s * 3;
+        const contribsPerPlayer = s * 2; // Increasing momentum
+        state.players.forEach((p, idx) => {
+          for (let c = 0; c < contribsPerPlayer; c++) {
+            const badgeId = idx % 2 === 0 ? 'primer_experimento' : 'lector_curioso';
+            state.collaborations.push({
+              id: 'c_' + Math.random(),
+              playerId: p.id,
+              badgeId,
+              day,
+              timestamp: Date.now() + c
+            });
+          }
+        });
+      }
+      refreshAllUI();
+    }
+
+    function loadMotivationSlumpPreset() {
+      state.currentDay = 12;
+      state.collaborations = [];
+      state.badgeStatusOverride = {};
+
+      // Period 1 & 2 active, Period 3 & 4 crashing
+      state.players.forEach((p, idx) => {
+        // Period 1 (Day 2): 4 contribs
+        for (let c = 0; c < 4; c++) {
+          state.collaborations.push({ id: 'c_' + Math.random(), playerId: p.id, badgeId: 'primer_experimento', day: 2, timestamp: 1 });
+        }
+        // Period 2 (Day 5): 5 contribs
+        for (let c = 0; c < 5; c++) {
+          state.collaborations.push({ id: 'c_' + Math.random(), playerId: p.id, badgeId: 'maestro_medicion', day: 5, timestamp: 2 });
+        }
+        // Period 3 (Day 8): 1 contrib (Crash!)
+        if (idx < 3) {
+          state.collaborations.push({ id: 'c_' + Math.random(), playerId: p.id, badgeId: 'maestro_medicion', day: 8, timestamp: 3 });
+        }
+        // Period 4 (Day 11): 0 contribs for almost everyone
+      });
+      refreshAllUI();
+    }
+
+    function loadBottleneckPreset() {
+      state.currentDay = 14;
+      state.collaborations = [];
+      state.badgeStatusOverride = {};
+
+      // 15 players unlock "Maestro de la Medición" on Day 2
+      state.players.forEach(p => {
+        state.collaborations.push({ id: 'c_' + Math.random(), playerId: p.id, badgeId: 'primer_experimento', day: 2, timestamp: 1 });
+        for (let c = 0; c < 3; c++) {
+          state.collaborations.push({ id: 'c_' + Math.random(), playerId: p.id, badgeId: 'maestro_medicion', day: 4, timestamp: 2 });
+        }
+      });
+
+      // Now "Reproducibilidad" was unlocked on Day 4 (t0 = 4) by 15 players!
+      // But now we are on Day 14 (10 days elapsed), and ZERO players have contributed to Reproducibilidad.
+      // i3 = 1 / (14 - 4) = 0.10 => Low CII decay!
+      refreshAllUI();
+    }
+
+    // Export & Import JSON
+    document.getElementById('btn-export-json').onclick = () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `vanishing_badges_sim_day_${state.currentDay}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    };
+
+    document.getElementById('import-json-file').onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const imported = JSON.parse(event.target.result);
+          if (imported.players && imported.collaborations) {
+            state = imported;
+            refreshAllUI();
+            alert('Simulation state successfully imported!');
+          }
+        } catch (err) {
+          alert('Error parsing JSON state file.');
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    // ==========================================
+    // 10. FORMULA MODAL INSPECTOR
+    // ==========================================
+
+    function showFormulaModal(type, targetId) {
+      const modal = document.getElementById('formula-modal');
+      const title = document.getElementById('modal-title');
+      const body = document.getElementById('modal-body');
+      modal.classList.remove('hidden');
+
+      const { CMI, avgPMI, badgeMetrics, playerRelPMI, playerBadgeI3, playerBadgeT0, playerBadgeAchievable } = computedData;
+
+      if (type === 'cmi') {
+        title.innerHTML = `<i data-lucide="calculator" class="w-4 h-4 text-indigo-400"></i> Definition 3.5: Community Motivation Indicator (CMI) Trace`;
+        const relList = state.players.map(p => (playerRelPMI[p.id] ?? 0).toFixed(2)).sort((a, b) => parseFloat(a) - parseFloat(b));
+        body.innerHTML = `
+          <div class="space-y-3">
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-indigo-300">
+              CMI = median( { relPMI(p) : p &isin; P } )
+            </div>
+            <p class="text-slate-300">
+              The Community Motivation Indicator is the median of relative motivation scores across all 20 players.
+            </p>
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1 font-mono text-[11px]">
+              <div>Community Avg PMI = <span class="text-white font-bold">${avgPMI.toFixed(2)}</span></div>
+              <div class="text-slate-400">Sorted relPMI values (20 players):</div>
+              <div class="text-emerald-400 font-bold break-all">[${relList.join(', ')}]</div>
+              <div class="pt-2 border-t border-slate-800 text-white">
+                Calculated CMI = <span class="text-amber-400 font-bold text-sm">${CMI.toFixed(2)}</span>
+                ${CMI < state.cmiThreshold ? '<span class="text-rose-400 font-bold ml-2">(ALERT: BELOW TRIGGER THRESHOLD)</span>' : '<span class="text-emerald-400 ml-2">(HEALTHY)</span>'}
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (type === 'cii') {
+        const badge = BADGES_CONFIG.find(b => b.id === targetId) || BADGES_CONFIG[0];
+        const m = badgeMetrics[badge.id];
+        title.innerHTML = `<i data-lucide="calculator" class="w-4 h-4 text-indigo-400"></i> Definitions 3.2 & 3.3: Interest Indicator Trace for ${badge.icon} ${badge.name}`;
+
+        const eligibles = state.players.filter(p => playerBadgeAchievable[p.id][badge.id]);
+        const i3List = eligibles.map(p => {
+          return {
+            name: p.name,
+            t0: playerBadgeT0[p.id][badge.id],
+            elapsed: Math.max(1, state.currentDay - playerBadgeT0[p.id][badge.id]),
+            i3: playerBadgeI3[p.id][badge.id]
+          };
+        });
+
+        const ciiScoreStr = m.CII !== null ? m.CII.toFixed(4) : 'N/A';
+
+        body.innerHTML = `
+          <div class="space-y-3">
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-indigo-300">
+              i3(p, b) = 1 / (now - t0(p, b)) &nbsp;&nbsp;|&nbsp;&nbsp; CII(b) = median( { i3(p, b) : p &isin; ep(b) } )
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-slate-300">
+              <div>Eligible Players |ep(b)|: <span class="text-white font-bold">${m.eligibleCount}</span></div>
+              <div>Earned Count |U_b|: <span class="text-white font-bold">${m.earnedCount}</span></div>
+              <div>Estimated Award Time (ET_b): <span class="text-white font-bold">${m.ET_b}</span></div>
+              <div>Community Interest (CII): <span class="text-amber-400 font-bold">${ciiScoreStr}</span></div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 max-h-48 overflow-y-auto space-y-1 font-mono text-[11px]">
+              <div class="text-slate-400 font-bold mb-1">Eligible Players Breakdown:</div>
+              ${i3List.length === 0 ? '<div class="text-slate-500">No players currently eligible for this badge.</div>' : i3List.map(item => `
+                <div class="flex justify-between text-slate-300 border-b border-slate-900 pb-0.5">
+                  <span>${item.name} (t0: Day ${item.t0})</span>
+                  <span>elapsed: ${item.elapsed}d &rarr; <span class="text-indigo-400 font-bold">i3 = 1/${item.elapsed} = ${item.i3.toFixed(3)}</span></span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (type === 'pmi') {
+        title.innerHTML = `<i data-lucide="calculator" class="w-4 h-4 text-indigo-400"></i> Definition 3.4: Player Motivation Indicator (PMI)`;
+        body.innerHTML = `
+          <div class="space-y-3">
+            <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-indigo-300">
+              PMI(p) = |{ s &isin; S : cnum(p, s) &ge; cnum(p, prev(s)) and [cnum(p, s) + cnum(p, prev(s))] &ne; 0 }|
+            </div>
+            <p class="text-slate-300 leading-relaxed">
+              For each engagement period s, a player receives +1 motivation point if their contributions equaled or exceeded the previous period prev(s), excluding inactive periods (0 &ge; 0).
+            </p>
+            <p class="text-slate-400 text-[11px]">
+              Relative PMI normalizes each player against the community average: relPMI(p) = PMI(p) / avg(PMI).
+            </p>
+          </div>
+        `;
+      }
+      lucide.createIcons();
+    }
+
+    function closeFormulaModal() {
+      document.getElementById('formula-modal').classList.add('hidden');
+    }
+
+    // Initialize application on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshAllUI();
+    });
+  </script>
+</body>
+</html>
