@@ -13,7 +13,7 @@ import { RegisterUserDTO } from './auth.controller';
 import { v4 as uuidv4 } from 'uuid';
 import * as nodemailer from 'nodemailer';
 import * as process from 'node:process';
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   MAX_REFRESH_SESSIONS,
@@ -54,12 +54,6 @@ export interface UserJWT {
  */
 function hashRefreshToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
-}
-
-/** Constant-time hex-string comparison to avoid timing attacks. */
-function safeHashCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
 }
 
 interface GoogleTokenPayload {
