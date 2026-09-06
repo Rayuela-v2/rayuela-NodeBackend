@@ -219,4 +219,56 @@ describe('VanishingBadgesStrategy', () => {
     expect(p1.periodContributions[1]).toBe(1);
     expect(p1.periodContributions[2]).toBe(1);
   });
+
+  it('should filter active players and evaluate community motivation based on minActiveCheckins', () => {
+    const p1Join = new Date('2026-06-01T00:00:00.000Z');
+    const players: PlayerProfile[] = [
+      { id: 'p1', joinDate: p1Join, earnedBadges: new Map() },
+      { id: 'p2', joinDate: p1Join, earnedBadges: new Map() },
+    ];
+
+    // p1 has 3 checkins; p2 has only 1 checkin
+    const checkins = [
+      { userId: 'p1', datetime: new Date('2026-06-02T10:00:00.000Z') },
+      { userId: 'p1', datetime: new Date('2026-06-03T10:00:00.000Z') },
+      { userId: 'p1', datetime: new Date('2026-06-04T10:00:00.000Z') },
+      { userId: 'p2', datetime: new Date('2026-06-02T10:00:00.000Z') },
+    ];
+
+    const ctx: IndicatorComputationContext = {
+      projectId: 'proj1',
+      badges: sampleBadges,
+      players,
+      checkins,
+      asOfDate: new Date('2026-06-14T23:59:59.000Z'),
+      daysPerPeriod: 7,
+      minActiveCheckins: 2, // p1 qualifies (3 >= 2), p2 does not (1 < 2)
+    };
+
+    const res = strategy.calculateIndicators(ctx);
+    expect(res.activePlayers).toBe(1);
+    expect(res.totalPlayers).toBe(2);
+
+    const p1Res = res.players.find((p) => p.playerId === 'p1')!;
+    const p2Res = res.players.find((p) => p.playerId === 'p2')!;
+
+    // p1 is active and sole contributor to community motivation
+    expect(p1Res.relPMI).toBe(1.0);
+    // p2 is below minActiveCheckins threshold so relPMI is 0.0
+    expect(p2Res.relPMI).toBe(0.0);
+  });
+
+  describe('computeMedian', () => {
+    it('should return 0 for empty array', () => {
+      expect(strategy.computeMedian([])).toBe(0);
+    });
+
+    it('should return middle element for odd length array', () => {
+      expect(strategy.computeMedian([5, 1, 3])).toBe(3);
+    });
+
+    it('should return average of two middle elements for even length array', () => {
+      expect(strategy.computeMedian([1, 2, 3, 4])).toBe(2.5);
+    });
+  });
 });

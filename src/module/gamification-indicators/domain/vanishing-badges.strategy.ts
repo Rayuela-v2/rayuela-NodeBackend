@@ -204,8 +204,13 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       };
     });
 
+    const minCheckins =
+      ctx.minActiveCheckins !== undefined && Number(ctx.minActiveCheckins) > 0
+        ? Number(ctx.minActiveCheckins)
+        : 1;
+
     // 4. Compute Player Motivation Indicator PMI(p) and relative relPMI(p)
-    const playerPMIs = players.map((p) => {
+    const allPlayerPMIs = players.map((p) => {
       const pmi = this.computePlayerMotivation(
         playerPeriodContribs[p.id] || {},
         currentPeriod,
@@ -213,14 +218,19 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       return { playerId: p.id, pmi };
     });
 
+    // P: set of active players meeting the minActiveCheckins threshold
+    const activePlayerPMIs = allPlayerPMIs.filter(
+      (item) => (playerTotalContribs[item.playerId] || 0) >= minCheckins,
+    );
+
     const { avgPMI, playerRelPMIs, CMI } =
-      this.computeCommunityMotivation(playerPMIs);
+      this.computeCommunityMotivation(activePlayerPMIs);
 
     const playerResults: PlayerIndicatorResult[] = players.map((p) => ({
       playerId: p.id,
       totalContributions: playerTotalContribs[p.id] || 0,
       periodContributions: playerPeriodContribs[p.id] || {},
-      PMI: playerPMIs.find((item) => item.playerId === p.id)?.pmi || 0,
+      PMI: allPlayerPMIs.find((item) => item.playerId === p.id)?.pmi || 0,
       relPMI: playerRelPMIs[p.id] || 0.0,
     }));
 
@@ -241,9 +251,7 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       }
     }
 
-    const activePlayersCount = players.filter(
-      (p) => (playerTotalContribs[p.id] || 0) > 0,
-    ).length;
+    const activePlayersCount = activePlayerPMIs.length;
 
     return {
       projectId,
@@ -411,13 +419,7 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       return null;
     }
 
-    const sorted = [...eligibleI3Values].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const medianVal =
-      sorted.length % 2 !== 0
-        ? sorted[mid]
-        : (sorted[mid - 1] + sorted[mid]) / 2.0;
-
+    const medianVal = this.computeMedian(eligibleI3Values);
     return parseFloat(medianVal.toFixed(4));
   }
 
@@ -496,20 +498,27 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       }
     });
 
-    const relValues = playerPMIs
-      .map((item) => playerRelPMIs[item.playerId])
-      .sort((a, b) => a - b);
-
-    const mid = Math.floor(relValues.length / 2);
-    const medianCMI =
-      relValues.length % 2 !== 0
-        ? relValues[mid]
-        : (relValues[mid - 1] + relValues[mid]) / 2.0;
+    const relValues = playerPMIs.map((item) => playerRelPMIs[item.playerId]);
+    const medianCMI = this.computeMedian(relValues);
 
     return {
       avgPMI: parseFloat(avgPMI.toFixed(2)),
       playerRelPMIs,
       CMI: isNaN(medianCMI) ? 0.0 : parseFloat(medianCMI.toFixed(3)),
     };
+  }
+
+  /**
+   * Helper to compute the statistical median of a numerical array.
+   */
+  computeMedian(values: number[]): number {
+    if (values.length === 0) {
+      return 0;
+    }
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2.0;
   }
 }

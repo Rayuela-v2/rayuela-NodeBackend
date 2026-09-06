@@ -103,7 +103,7 @@ export class GamificationIndicatorsService {
       const move = moveByCheckinId.get(chId);
       return {
         id: chId,
-        userId: c.user?.id || (c as any).userId,
+        userId: c.userId || c.user?.id || (c as any).userId,
         datetime: new Date(c.date),
         taskType: c.taskType,
         contributesTo: c.contributesTo,
@@ -162,6 +162,10 @@ export class GamificationIndicatorsService {
       };
     });
 
+    const minActiveCheckins = query.minActiveCheckins
+      ? parseInt(String(query.minActiveCheckins), 10)
+      : 1;
+
     // 5. Build computation context and delegate to formula strategy
     const ctx: IndicatorComputationContext = {
       projectId,
@@ -171,6 +175,7 @@ export class GamificationIndicatorsService {
       startDate,
       asOfDate,
       daysPerPeriod,
+      minActiveCheckins: isNaN(minActiveCheckins) ? 1 : minActiveCheckins,
     };
 
     return this.formulaStrategy.calculateIndicators(ctx);

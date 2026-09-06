@@ -3,6 +3,9 @@ import { GamificationIndicatorsController } from './gamification-indicators.cont
 import { GamificationIndicatorsService } from './gamification-indicators.service';
 import { CommunityIndicatorsResponseDto } from './dto/indicators-response.dto';
 
+import { JwtAuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+
 describe('GamificationIndicatorsController', () => {
   let controller: GamificationIndicatorsController;
   let service: Partial<GamificationIndicatorsService>;
@@ -36,7 +39,12 @@ describe('GamificationIndicatorsController', () => {
           useValue: service,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<GamificationIndicatorsController>(
       GamificationIndicatorsController,

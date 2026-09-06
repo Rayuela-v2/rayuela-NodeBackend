@@ -125,7 +125,8 @@ describe('GamificationIndicatorsService', () => {
     (checkInDao.findAllByProjectId as jest.Mock).mockResolvedValue([
       {
         id: 'c1',
-        user: { id: 'u1' },
+        userId: 'u1',
+        user: null,
         date: new Date('2026-06-02T10:00:00.000Z'),
         taskType: 'species',
         contributesTo: 't1',

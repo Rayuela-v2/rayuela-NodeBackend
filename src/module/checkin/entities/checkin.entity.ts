@@ -47,6 +47,10 @@ export class Checkin {
     return this.#user;
   }
 
+  get userId(): string {
+    return this.#user?.id;
+  }
+
   get longitude(): string {
     return this.#longitude;
   }
