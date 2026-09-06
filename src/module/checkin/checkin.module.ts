@@ -34,7 +34,7 @@ import { CheckinIdempotencyDao } from './persistence/checkin-idempotency.dao';
     StorageModule,
   ],
 
-  exports: [CheckinService],
+  exports: [CheckinService, CheckInDao, MoveDao],
   controllers: [CheckinController],
   providers: [CheckinService, CheckInDao, MoveDao, CheckinIdempotencyDao],
 })
