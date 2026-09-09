@@ -34,12 +34,18 @@ export class CheckinMapper {
       imageRefs = [template.imageRef];
     }
 
+    const effectiveUser =
+      user ||
+      (template.userId
+        ? ({ id: String(template.userId) } as unknown as User)
+        : null);
+
     const checkin = new Checkin(
       template.latitude,
       template.longitude,
       template.datetime,
       template.projectId,
-      user,
+      effectiveUser,
       template.taskType,
       template._id,
       null,

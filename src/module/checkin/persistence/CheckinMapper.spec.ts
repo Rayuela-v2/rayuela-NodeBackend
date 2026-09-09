@@ -77,5 +77,20 @@ describe('CheckinMapper', () => {
       const entity = CheckinMapper.toEntity(template, user);
       expect(entity.contributesTo).toBe('');
     });
+
+    it('should fallback to template.userId when user argument is null', () => {
+      const template = {
+        latitude: '1',
+        longitude: '2',
+        datetime: new Date(),
+        projectId: 'p1',
+        userId: 'user-fallback-123',
+        taskType: 'type',
+        _id: 'id1',
+      } as any;
+      const entity = CheckinMapper.toEntity(template, null);
+      expect(entity.userId).toBe('user-fallback-123');
+      expect(entity.user?.id).toBe('user-fallback-123');
+    });
   });
 });

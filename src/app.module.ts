@@ -14,6 +14,7 @@ import { LeaderboardModule } from './module/leaderboard/leaderboard.module';
 import { StorageModule } from './module/storage/storage.module';
 import { AnalyticsModule } from './module/analytics/analytics.module';
 import { HealthModule } from './module/health/health.module';
+import { GamificationIndicatorsModule } from './module/gamification-indicators/gamification-indicators.module';
 
 console.log(process.env.DB_CONNECTION as string);
 @Module({
@@ -29,6 +30,7 @@ console.log(process.env.DB_CONNECTION as string);
     CheckinModule,
     VolunteerModule,
     GamificationModule,
+    GamificationIndicatorsModule,
     LeaderboardModule,
     StorageModule,
     AnalyticsModule,

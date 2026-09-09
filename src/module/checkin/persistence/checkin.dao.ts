@@ -107,9 +107,10 @@ export class CheckInDao {
    * timezone; if a streak flipping at the wrong hour ever bothers anyone,
    * pass a tz offset into `$dateToString`.
    */
-  async statsByUser(
-    userId: string,
-  ): Promise<{ byProject: { projectId: string; count: number }[]; days: string[] }> {
+  async statsByUser(userId: string): Promise<{
+    byProject: { projectId: string; count: number }[];
+    days: string[];
+  }> {
     const [result] = await this.checkInModel
       .aggregate([
         { $match: { userId } },
@@ -154,6 +155,14 @@ export class CheckInDao {
   ): Promise<Checkin[]> {
     const list = await this.checkInModel
       .find({ projectId, userId })
+      .sort({ datetime: 1 })
+      .exec();
+    return list.map((c) => CheckinMapper.toEntity(c, null));
+  }
+
+  async findAllByProjectId(projectId: string): Promise<Checkin[]> {
+    const list = await this.checkInModel
+      .find({ projectId })
       .sort({ datetime: 1 })
       .exec();
     return list.map((c) => CheckinMapper.toEntity(c, null));

@@ -6,6 +6,7 @@
 
 - **Adaptive Gamification Strategies**
   - [Badge Fading](adaptive-gamification/badge-fading.md)
+  - [Indicators Engine](adaptive-gamification/indicators-engine.md)
   - [Vanishing Badges Simulator](adaptive-gamification/simulator.md)
   - <a href="vanishing_badges_simulator.html" target="_blank">Simulator (Fullscreen ↗)</a>
 
