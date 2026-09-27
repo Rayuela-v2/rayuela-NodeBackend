@@ -56,7 +56,9 @@ describe('mail.templates', () => {
         buttonUrl: 'https://example.com/test',
       });
 
-      expect(html).not.toContain('<hr style="border: none; border-top: 1px solid #e5e7eb;');
+      expect(html).not.toContain(
+        '<hr style="border: none; border-top: 1px solid #e5e7eb;',
+      );
     });
   });
 

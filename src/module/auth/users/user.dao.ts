@@ -106,7 +106,11 @@ export class UserDao {
 
     const legacy = await this.userModel
       .updateOne(
-        { _id: userId, refreshTokenHash: hash, refreshTokenExpiry: { $gt: now } },
+        {
+          _id: userId,
+          refreshTokenHash: hash,
+          refreshTokenExpiry: { $gt: now },
+        },
         {
           $set: { refreshTokenHash: null, refreshTokenExpiry: null },
           $push: {

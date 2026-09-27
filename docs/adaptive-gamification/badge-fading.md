@@ -100,6 +100,11 @@ PATCH /v1/gamification/:projectId/badge/:badgeId/status/active
 
 The response is embedded in the project details payload returned to mobile clients (`GET /v1/projects/:id`).
 
+#### 3.1.1 Indicator-Driven Candidate Suggestion & Timeseries
+In the administrative panel (`/admin/project/:projectId/gamification/fading`), fading decisions are backed by the **Adaptive Gamification Indicators Engine**:
+- **Intelligent Suggestion**: Instead of arbitrary manual selection, the system queries `GET /v1/gamification-indicators/:projectId` to recommend the active candidate badge with lowest Community Interest ($b^* = \arg\min CII(b)$).
+- **Historical Timeseries**: The interface queries `GET /v1/gamification-indicators/:projectId/timeline` to visualize community interest changes across selectable date windows (`7D`, `14D`, `30D`, `90D`), showing if a badge's interest has deteriorated below the critical adaptation threshold ($x = 0.20$).
+
 ---
 
 ### 3.2 Mobile Persistence Layer (`AppDatabase` & `NotificationsDao`)

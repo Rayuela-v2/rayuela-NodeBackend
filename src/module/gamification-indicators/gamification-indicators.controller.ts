@@ -3,6 +3,8 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GamificationIndicatorsService } from './gamification-indicators.service';
 import { GetIndicatorsQueryDto } from './dto/get-indicators-query.dto';
 import { CommunityIndicatorsResponseDto } from './dto/indicators-response.dto';
+import { GetIndicatorsTimelineQueryDto } from './dto/get-indicators-timeline-query.dto';
+import { IndicatorsTimelineResponseDto } from './dto/indicators-timeline-response.dto';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/role.decorator';
@@ -38,5 +40,26 @@ export class GamificationIndicatorsController {
     @Query() query: GetIndicatorsQueryDto,
   ): Promise<CommunityIndicatorsResponseDto> {
     return this.indicatorsService.computeIndicators(projectId, query);
+  }
+
+  /**
+   * Returns a historical time-series of Community Interest Indicators (CII)
+   * across a date window for project badges.
+   */
+  @Get(':projectId/timeline')
+  @ApiOperation({
+    summary:
+      'Calculates and returns time-series snapshots of Community Interest (CII) across a date window',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Historical CII timeseries for project badges',
+    type: IndicatorsTimelineResponseDto,
+  })
+  async getIndicatorsTimeline(
+    @Param('projectId') projectId: string,
+    @Query() query: GetIndicatorsTimelineQueryDto,
+  ): Promise<IndicatorsTimelineResponseDto> {
+    return this.indicatorsService.computeIndicatorsTimeline(projectId, query);
   }
 }

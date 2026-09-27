@@ -71,4 +71,30 @@ describe('GamificationIndicatorsController', () => {
     });
     expect(result).toEqual(mockResponse);
   });
+
+  it('should return indicators timeline from service', async () => {
+    const mockTimelineResponse = {
+      projectId: 'proj1',
+      threshold: 0.2,
+      startDate: '2026-05-15T00:00:00.000Z',
+      endDate: '2026-06-15T00:00:00.000Z',
+      stepDays: 7,
+      timestamps: ['2026-05-15T00:00:00.000Z', '2026-06-15T00:00:00.000Z'],
+      series: [],
+    };
+    service.computeIndicatorsTimeline = jest
+      .fn()
+      .mockResolvedValue(mockTimelineResponse);
+
+    const result = await controller.getIndicatorsTimeline('proj1', {
+      startDate: '2026-05-15',
+      endDate: '2026-06-15',
+    });
+
+    expect(service.computeIndicatorsTimeline).toHaveBeenCalledWith('proj1', {
+      startDate: '2026-05-15',
+      endDate: '2026-06-15',
+    });
+    expect(result).toEqual(mockTimelineResponse);
+  });
 });

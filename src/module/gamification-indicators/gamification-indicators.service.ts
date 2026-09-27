@@ -12,12 +12,15 @@ import {
 import {
   BadgeDefinition,
   CheckinRecord,
+  CommunityIndicatorResult,
   IndicatorComputationContext,
   PlayerEarnedBadge,
   PlayerProfile,
 } from './domain/indicator.types';
 import { GetIndicatorsQueryDto } from './dto/get-indicators-query.dto';
 import { CommunityIndicatorsResponseDto } from './dto/indicators-response.dto';
+import { GetIndicatorsTimelineQueryDto } from './dto/get-indicators-timeline-query.dto';
+import { IndicatorsTimelineResponseDto } from './dto/indicators-timeline-response.dto';
 import { CheckInDao } from '../checkin/persistence/checkin.dao';
 import { UserDao } from '../auth/users/user.dao';
 import { GamificationDao } from '../gamification/persistence/gamification-dao.service';
@@ -47,17 +50,186 @@ export class GamificationIndicatorsService {
       ? this.parseDate(query.asOfDate, 'end', 'asOfDate')
       : new Date();
 
-    let threshold = 0.2;
-    if (query?.threshold !== undefined && query?.threshold !== '') {
-      const parsedThreshold = Number(query.threshold);
-      if (isNaN(parsedThreshold) || parsedThreshold <= 0) {
-        throw new BadRequestException(
-          `Invalid threshold value: "${query.threshold}". Must be a positive number (e.g. 0.20).`,
-        );
-      }
-      threshold = parsedThreshold;
+    const threshold = this.parseThreshold(query?.threshold);
+    const minActiveCheckins = this.parseMinActiveCheckins(
+      query?.minActiveCheckins,
+    );
+
+    const { badges, checkins, players } = await this.loadProjectComputationData(
+      projectId,
+      asOfDate,
+    );
+
+    const ctx: IndicatorComputationContext = {
+      projectId,
+      badges,
+      players,
+      checkins,
+      asOfDate,
+      threshold,
+      minActiveCheckins,
+    };
+
+    return this.formulaStrategy.calculateIndicators(ctx);
+  }
+
+  /**
+   * Computes historical time-series snapshots of Community Interest (CII) across a date window.
+   */
+  async computeIndicatorsTimeline(
+    projectId: string,
+    query?: GetIndicatorsTimelineQueryDto,
+  ): Promise<IndicatorsTimelineResponseDto> {
+    const threshold = this.parseThreshold(query?.threshold);
+    const minActiveCheckins = this.parseMinActiveCheckins(
+      query?.minActiveCheckins,
+    );
+
+    const endDate = query?.endDate
+      ? this.parseDate(query.endDate, 'end', 'endDate')
+      : new Date();
+
+    const defaultStart = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startDate = query?.startDate
+      ? this.parseDate(query.startDate, 'start', 'startDate')
+      : defaultStart;
+
+    if (startDate.getTime() > endDate.getTime()) {
+      throw new BadRequestException(
+        `startDate (${startDate.toISOString()}) must be before or equal to endDate (${endDate.toISOString()})`,
+      );
     }
 
+    const diffDays = Math.max(
+      1,
+      Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    );
+
+    let stepDays = 1;
+    if (query?.stepDays !== undefined && query?.stepDays !== '') {
+      const parsedStep = Number(query.stepDays);
+      if (isNaN(parsedStep) || parsedStep <= 0) {
+        throw new BadRequestException(
+          `Invalid stepDays value: "${query.stepDays}". Must be a positive integer.`,
+        );
+      }
+      stepDays = Math.max(1, Math.floor(parsedStep));
+    } else {
+      if (diffDays > 60) {
+        stepDays = Math.max(1, Math.round(diffDays / 30));
+      } else if (diffDays > 14) {
+        stepDays = Math.max(1, Math.round(diffDays / 20));
+      }
+    }
+
+    // Generate sample timestamps
+    const sampleDates: Date[] = [];
+    let currentMs = startDate.getTime();
+    const endMs = endDate.getTime();
+    const stepMs = stepDays * 24 * 60 * 60 * 1000;
+
+    while (currentMs < endMs) {
+      sampleDates.push(new Date(currentMs));
+      currentMs += stepMs;
+    }
+    // Always include the exact end date as the last point if not already present
+    if (
+      sampleDates.length === 0 ||
+      sampleDates[sampleDates.length - 1].getTime() !== endMs
+    ) {
+      sampleDates.push(endDate);
+    }
+
+    const { badges, checkins, players } = await this.loadProjectComputationData(
+      projectId,
+      endDate,
+    );
+
+    // Filter badges if badgeId query param is supplied
+    const targetBadges = query?.badgeId
+      ? badges.filter(
+          (b) =>
+            String(b.id) === String(query.badgeId) || b.name === query.badgeId,
+        )
+      : badges;
+
+    // Evaluate snapshots across timeline
+    const badgePointsMap = new Map<string, (number | null)[]>();
+    targetBadges.forEach((b) => badgePointsMap.set(b.id, []));
+
+    let latestSnapshot: CommunityIndicatorResult | null = null;
+
+    for (const sampleDate of sampleDates) {
+      const ctx: IndicatorComputationContext = {
+        projectId,
+        badges,
+        players,
+        checkins,
+        asOfDate: sampleDate,
+        threshold,
+        minActiveCheckins,
+      };
+
+      const result = this.formulaStrategy.calculateIndicators(ctx);
+      latestSnapshot = result;
+
+      const resultMap = new Map<string, number | null>();
+      result.badges.forEach((b) => {
+        resultMap.set(b.badgeId, b.CII);
+      });
+
+      targetBadges.forEach((b) => {
+        const ciiVal = resultMap.get(b.id) ?? null;
+        badgePointsMap.get(b.id)!.push(ciiVal);
+      });
+    }
+
+    // Build series response
+    const series = targetBadges.map((b) => {
+      const latestMetric = latestSnapshot?.badges.find(
+        (m) => m.badgeId === b.id,
+      );
+      const points = badgePointsMap.get(b.id) || [];
+      const currentCII =
+        points.length > 0
+          ? points[points.length - 1]
+          : latestMetric?.CII ?? null;
+
+      return {
+        badgeId: b.id,
+        badgeName: b.name,
+        status: b.status,
+        points,
+        isCandidate: latestMetric?.isCandidate ?? false,
+        isLowestCII: latestMetric?.isLowestCII ?? false,
+        currentCII,
+      };
+    });
+
+    return {
+      projectId,
+      threshold,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      stepDays,
+      timestamps: sampleDates.map((d) => d.toISOString()),
+      series,
+    };
+  }
+
+  /**
+   * Helper to load and assemble raw project data into domain computation models.
+   */
+  private async loadProjectComputationData(
+    projectId: string,
+    fallbackDate: Date,
+  ): Promise<{
+    badges: BadgeDefinition[];
+    checkins: CheckinRecord[];
+    players: PlayerProfile[];
+  }> {
     // 1. Fetch project gamification rules
     const gamification =
       await this.gamificationDao.getGamificationByProjectId(projectId);
@@ -80,7 +252,6 @@ export class GamificationIndicatorsService {
         ? await this.moveDao.findMovesByCheckinIds(checkinIds)
         : [];
 
-    // Index moves by checkinId for quick lookup
     const moveByCheckinId = new Map<string, any>();
     moves.forEach((m) => {
       moveByCheckinId.set(String(m.checkinId), m);
@@ -115,14 +286,13 @@ export class GamificationIndicatorsService {
       };
     });
 
-    // Build player profiles and resolve earned badges with timestamps & contribution counts
+    // Build player profiles
     const players: PlayerProfile[] = rawUsers.map((u) => {
       const uId = String(u.id);
       const earnedBadges = new Map<string, PlayerEarnedBadge>();
       const projectProfile = u.getGameProfileFromProject(projectId);
       const profileBadges = projectProfile?.badges || [];
 
-      // Find user check-ins sorted chronologically
       const userCheckins = checkins
         .filter((c) => String(c.userId) === uId)
         .sort((a, b) => a.datetime.getTime() - b.datetime.getTime());
@@ -146,7 +316,6 @@ export class GamificationIndicatorsService {
         }
       });
 
-      // Fallback for badges in profile not captured in moves
       profileBadges.forEach((badgeName) => {
         const matchedBadge = badges.find(
           (b) => b.name === badgeName || b.id === badgeName,
@@ -154,7 +323,7 @@ export class GamificationIndicatorsService {
         if (matchedBadge && !earnedBadges.has(matchedBadge.id)) {
           earnedBadges.set(matchedBadge.id, {
             badgeId: matchedBadge.id,
-            earnedAt: u.createdAt || asOfDate,
+            earnedAt: u.createdAt || fallbackDate,
             contribsAtEarn: runningContribCount,
           });
         }
@@ -162,28 +331,33 @@ export class GamificationIndicatorsService {
 
       return {
         id: uId,
-        joinDate: u.createdAt || asOfDate,
+        joinDate: u.createdAt || fallbackDate,
         earnedBadges,
       };
     });
 
-    const minActiveCheckins =
-      query?.minActiveCheckins !== undefined
-        ? parseInt(String(query.minActiveCheckins), 10)
-        : 0;
+    return { badges, checkins, players };
+  }
 
-    // 5. Build computation context and delegate to formula strategy
-    const ctx: IndicatorComputationContext = {
-      projectId,
-      badges,
-      players,
-      checkins,
-      asOfDate,
-      threshold,
-      minActiveCheckins: isNaN(minActiveCheckins) ? 0 : minActiveCheckins,
-    };
+  private parseThreshold(thresholdRaw?: number | string): number {
+    if (thresholdRaw !== undefined && thresholdRaw !== '') {
+      const parsed = Number(thresholdRaw);
+      if (isNaN(parsed) || parsed <= 0) {
+        throw new BadRequestException(
+          `Invalid threshold value: "${thresholdRaw}". Must be a positive number (e.g. 0.20).`,
+        );
+      }
+      return parsed;
+    }
+    return 0.2;
+  }
 
-    return this.formulaStrategy.calculateIndicators(ctx);
+  private parseMinActiveCheckins(minRaw?: number | string): number {
+    if (minRaw !== undefined && minRaw !== '') {
+      const parsed = parseInt(String(minRaw), 10);
+      return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    }
+    return 0;
   }
 
   /**

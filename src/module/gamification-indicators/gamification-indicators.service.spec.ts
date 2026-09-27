@@ -157,4 +157,119 @@ describe('GamificationIndicatorsService', () => {
     expect(formulaStrategy.calculateIndicators).toHaveBeenCalled();
     expect(result.projectId).toBe('proj1');
   });
+
+  describe('computeIndicatorsTimeline', () => {
+    it('should throw BadRequestException if startDate is after endDate', async () => {
+      await expect(
+        service.computeIndicatorsTimeline('proj1', {
+          startDate: '2026-07-01',
+          endDate: '2026-06-01',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if stepDays is invalid', async () => {
+      await expect(
+        service.computeIndicatorsTimeline('proj1', {
+          stepDays: 0,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should compute timeline snapshots across date window and build series', async () => {
+      (
+        gamificationDao.getGamificationByProjectId as jest.Mock
+      ).mockResolvedValue(
+        new Gamification(
+          'proj1',
+          [
+            {
+              _id: 'badge1',
+              name: 'Insignia 1',
+              checkinsAmount: 2,
+              status: 'active',
+            } as any,
+          ],
+          [],
+        ),
+      );
+
+      (formulaStrategy.calculateIndicators as jest.Mock).mockImplementation(
+        (ctx) => ({
+          projectId: 'proj1',
+          asOfDate: ctx.asOfDate.toISOString(),
+          threshold: ctx.threshold,
+          badges: [
+            {
+              badgeId: 'badge1',
+              badgeName: 'Insignia 1',
+              status: 'active',
+              CII: 0.25,
+              isCandidate: true,
+              isLowestCII: true,
+            },
+          ],
+        }),
+      );
+
+      const res = await service.computeIndicatorsTimeline('proj1', {
+        startDate: '2026-06-01',
+        endDate: '2026-06-05',
+        stepDays: 2,
+        threshold: 0.2,
+      });
+
+      expect(res.projectId).toBe('proj1');
+      expect(res.threshold).toBe(0.2);
+      expect(res.stepDays).toBe(2);
+      expect(res.timestamps.length).toBeGreaterThan(1);
+      expect(res.series).toHaveLength(1);
+      expect(res.series[0].badgeId).toBe('badge1');
+      expect(res.series[0].points.length).toBe(res.timestamps.length);
+      expect(res.series[0].isCandidate).toBe(true);
+      expect(res.series[0].isLowestCII).toBe(true);
+      expect(res.series[0].currentCII).toBe(0.25);
+    });
+
+    it('should filter series by badgeId when provided', async () => {
+      (
+        gamificationDao.getGamificationByProjectId as jest.Mock
+      ).mockResolvedValue(
+        new Gamification(
+          'proj1',
+          [
+            {
+              _id: 'b1',
+              name: 'Badge 1',
+              checkinsAmount: 1,
+              status: 'active',
+            } as any,
+            {
+              _id: 'b2',
+              name: 'Badge 2',
+              checkinsAmount: 2,
+              status: 'active',
+            } as any,
+          ],
+          [],
+        ),
+      );
+
+      (formulaStrategy.calculateIndicators as jest.Mock).mockReturnValue({
+        badges: [
+          { badgeId: 'b1', CII: 0.15, isCandidate: true, isLowestCII: true },
+          { badgeId: 'b2', CII: 0.4, isCandidate: true, isLowestCII: false },
+        ],
+      });
+
+      const res = await service.computeIndicatorsTimeline('proj1', {
+        startDate: '2026-06-01',
+        endDate: '2026-06-03',
+        badgeId: 'b1',
+      });
+
+      expect(res.series).toHaveLength(1);
+      expect(res.series[0].badgeId).toBe('b1');
+    });
+  });
 });

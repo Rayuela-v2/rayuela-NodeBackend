@@ -45,7 +45,10 @@ export class UserService {
    * `email`, `username` y `role` no son editables por acá a propósito —
    * el email identifica la cuenta.
    */
-  async updateProfile(username: string, patch: UpdateProfileDTO): Promise<User> {
+  async updateProfile(
+    username: string,
+    patch: UpdateProfileDTO,
+  ): Promise<User> {
     const user = await this.userDao.findByEmailOrUsername('', username);
     if (!user) {
       throw new NotFoundException('User not found');
