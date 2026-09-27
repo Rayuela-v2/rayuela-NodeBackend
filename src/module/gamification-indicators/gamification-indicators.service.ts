@@ -104,9 +104,10 @@ export class GamificationIndicatorsService {
     const checkins: CheckinRecord[] = rawCheckins.map((c) => {
       const chId = String(c.id);
       const move = moveByCheckinId.get(chId);
+      const rawUserId = c.userId || c.user?.id || (c as any).userId;
       return {
         id: chId,
-        userId: c.userId || c.user?.id || (c as any).userId,
+        userId: rawUserId ? String(rawUserId) : '',
         datetime: new Date(c.date),
         taskType: c.taskType,
         contributesTo: c.contributesTo,
@@ -116,13 +117,14 @@ export class GamificationIndicatorsService {
 
     // Build player profiles and resolve earned badges with timestamps & contribution counts
     const players: PlayerProfile[] = rawUsers.map((u) => {
+      const uId = String(u.id);
       const earnedBadges = new Map<string, PlayerEarnedBadge>();
       const projectProfile = u.getGameProfileFromProject(projectId);
       const profileBadges = projectProfile?.badges || [];
 
       // Find user check-ins sorted chronologically
       const userCheckins = checkins
-        .filter((c) => c.userId === u.id)
+        .filter((c) => String(c.userId) === uId)
         .sort((a, b) => a.datetime.getTime() - b.datetime.getTime());
 
       let runningContribCount = 0;
@@ -159,7 +161,7 @@ export class GamificationIndicatorsService {
       });
 
       return {
-        id: u.id,
+        id: uId,
         joinDate: u.createdAt || asOfDate,
         earnedBadges,
       };

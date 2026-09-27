@@ -65,14 +65,17 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
     > = new Map();
 
     players.forEach((p) => {
-      playerTotalContribs[p.id] = 0;
-      playerEarnedBadgesMap.set(p.id, new Map(p.earnedBadges || []));
+      const pId = String(p.id);
+      playerTotalContribs[pId] = 0;
+      playerEarnedBadgesMap.set(pId, new Map(p.earnedBadges || []));
     });
 
     validCheckins.forEach((c) => {
-      const pId = c.userId;
+      const pId = String(c.userId);
       if (playerTotalContribs[pId] === undefined) {
         playerTotalContribs[pId] = 0;
+      }
+      if (!playerEarnedBadgesMap.has(pId)) {
         playerEarnedBadgesMap.set(pId, new Map());
       }
 
@@ -85,8 +88,8 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
             (b) => b.id === badgeRef || b.name === badgeRef,
           );
           if (matchedBadge) {
-            const playerBadgeMap = playerEarnedBadgesMap.get(pId)!;
-            if (!playerBadgeMap.has(matchedBadge.id)) {
+            const playerBadgeMap = playerEarnedBadgesMap.get(pId);
+            if (playerBadgeMap && !playerBadgeMap.has(matchedBadge.id)) {
               playerBadgeMap.set(matchedBadge.id, {
                 badgeId: matchedBadge.id,
                 earnedAt: new Date(c.datetime),
@@ -106,13 +109,16 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
 
     const evaluatedPlayers =
       minCheckins > 0
-        ? players.filter((p) => (playerTotalContribs[p.id] || 0) >= minCheckins)
+        ? players.filter(
+            (p) => (playerTotalContribs[String(p.id)] || 0) >= minCheckins,
+          )
         : players;
 
     const activePlayersCount =
       minCheckins > 0
         ? evaluatedPlayers.length
-        : players.filter((p) => (playerTotalContribs[p.id] || 0) >= 1).length;
+        : players.filter((p) => (playerTotalContribs[String(p.id)] || 0) >= 1)
+            .length;
 
     // 3. Compute AB(p) [Def 3.1], t_0(p, b), i_3(p, b) [Def 3.2], and ignored_by(p) [Def 3.3]
     const playerBadgeT0: Record<string, Record<string, Date>> = {};
@@ -122,12 +128,13 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
     const playerIgnoredList: Record<string, string[]> = {};
 
     players.forEach((p) => {
-      playerBadgeT0[p.id] = {};
-      playerBadgeAchievable[p.id] = {};
-      playerBadgeI3[p.id] = {};
-      playerABList[p.id] = [];
+      const pId = String(p.id);
+      playerBadgeT0[pId] = {};
+      playerBadgeAchievable[pId] = {};
+      playerBadgeI3[pId] = {};
+      playerABList[pId] = [];
 
-      const earned = playerEarnedBadgesMap.get(p.id) || new Map();
+      const earned = playerEarnedBadgesMap.get(pId) || new Map();
       const earnedIds = new Set<string>(earned.keys());
 
       badges.forEach((b) => {
@@ -137,17 +144,17 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
           badges,
           earned,
         );
-        playerBadgeAchievable[p.id][b.id] = isAchievable;
-        playerBadgeT0[p.id][b.id] = t0Date;
+        playerBadgeAchievable[pId][b.id] = isAchievable;
+        playerBadgeT0[pId][b.id] = t0Date;
 
         if (isAchievable) {
-          playerABList[p.id].push(b.id);
+          playerABList[pId].push(b.id);
         }
 
         const isEarned = earned.has(b.id);
         const earnedDate = isEarned ? earned.get(b.id)!.earnedAt : null;
 
-        playerBadgeI3[p.id][b.id] = this.computeIndividualInterest(
+        playerBadgeI3[pId][b.id] = this.computeIndividualInterest(
           isAchievable,
           isEarned,
           t0Date,
@@ -156,10 +163,10 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
         );
       });
 
-      playerIgnoredList[p.id] = this.computeIgnoredBadges(
-        playerABList[p.id],
+      playerIgnoredList[pId] = this.computeIgnoredBadges(
+        playerABList[pId],
         earnedIds,
-        playerBadgeI3[p.id],
+        playerBadgeI3[pId],
         threshold,
       );
     });
@@ -178,18 +185,19 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
     const badgeMetrics: BadgeIndicatorResult[] = badges.map((b) => {
       // U_b: Players in P who have earned badge b
       const UbPlayers = evaluatedPlayers.filter((p) =>
-        playerEarnedBadgesMap.get(p.id)?.has(b.id),
+        playerEarnedBadgesMap.get(String(p.id))?.has(b.id),
       );
 
       // ep(b) = { p in P : b in AB(p) - B_p }
       const eligiblePlayers = evaluatedPlayers.filter((p) => {
-        const isAchievable = playerBadgeAchievable[p.id]?.[b.id] ?? false;
-        const hasEarned = playerEarnedBadgesMap.get(p.id)?.has(b.id) ?? false;
+        const pId = String(p.id);
+        const isAchievable = playerBadgeAchievable[pId]?.[b.id] ?? false;
+        const hasEarned = playerEarnedBadgesMap.get(pId)?.has(b.id) ?? false;
         return isAchievable && !hasEarned;
       });
 
       const eligibleI3Values = eligiblePlayers.map(
-        (p) => playerBadgeI3[p.id][b.id],
+        (p) => playerBadgeI3[String(p.id)][b.id],
       );
       const CII = this.computeCommunityInterest(eligibleI3Values);
 
@@ -206,7 +214,7 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
         evaluatedPlayers.length > 0 &&
         UbPlayers.length === evaluatedPlayers.length;
       const canAnyoneAchieve = evaluatedPlayers.some(
-        (p) => playerBadgeAchievable[p.id]?.[b.id] ?? false,
+        (p) => playerBadgeAchievable[String(p.id)]?.[b.id] ?? false,
       );
       const isUnreachable = !canAnyoneAchieve;
       const isExpired = b.status === 'expired';
@@ -228,9 +236,9 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
         badgeName: b.name,
         status: b.status,
         earnedCount: UbPlayers.length,
-        earnedUsers: UbPlayers.map((u) => u.id),
+        earnedUsers: UbPlayers.map((u) => String(u.id)),
         eligibleCount: eligiblePlayers.length,
-        eligibleUsers: eligiblePlayers.map((p) => p.id),
+        eligibleUsers: eligiblePlayers.map((p) => String(p.id)),
         CII,
         isCommunityIgnored,
         isCandidate,
@@ -265,17 +273,18 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
     // Build player indicator results for the evaluated player pool P
     let totalPlayerIgnored = 0;
     const playerResults: PlayerIndicatorResult[] = evaluatedPlayers.map((p) => {
-      const earned = playerEarnedBadgesMap.get(p.id) || new Map();
-      const ignored = playerIgnoredList[p.id] || [];
+      const pId = String(p.id);
+      const earned = playerEarnedBadgesMap.get(pId) || new Map();
+      const ignored = playerIgnoredList[pId] || [];
       totalPlayerIgnored += ignored.length;
 
       return {
-        playerId: p.id,
-        totalContributions: playerTotalContribs[p.id] || 0,
+        playerId: pId,
+        totalContributions: playerTotalContribs[pId] || 0,
         earnedBadges: Array.from(earned.keys()),
-        achievableBadges: playerABList[p.id] || [],
+        achievableBadges: playerABList[pId] || [],
         ignoredBadges: ignored,
-        individualInterest: playerBadgeI3[p.id] || {},
+        individualInterest: playerBadgeI3[pId] || {},
       };
     });
 
