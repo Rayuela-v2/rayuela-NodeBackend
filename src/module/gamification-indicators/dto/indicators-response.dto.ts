@@ -17,35 +17,45 @@ export class BadgeIndicatorDto {
   earnedCount: number;
 
   @ApiProperty({
-    description: 'User IDs who have earned this badge',
+    description: 'User IDs who have earned this badge (U_b)',
     type: [String],
   })
   earnedUsers: string[];
 
   @ApiProperty({
     description:
-      'Estimated Awarding Time (historical average contributions at award)',
-  })
-  ET_b: number;
-
-  @ApiProperty({
-    description:
-      'Number of eligible players who unlocked prerequisites but not yet earned',
+      'Number of eligible players who unlocked prerequisites (b in AB(p)) but have not yet earned it',
   })
   eligibleCount: number;
 
-  @ApiProperty({ description: 'User IDs of eligible players', type: [String] })
+  @ApiProperty({
+    description: 'User IDs of eligible players ep(b)',
+    type: [String],
+  })
   eligibleUsers: string[];
 
   @ApiProperty({
     description:
-      'Community Interest Indicator (median individual interest across eligible players)',
+      'Community Interest Indicator [Def 3.4] (median individual interest i3 across eligible players)',
     nullable: true,
   })
   CII: number | null;
 
   @ApiProperty({
-    description: 'True if this badge has the lowest CII in the community',
+    description:
+      'True if CII(b) is below reference threshold x (§4.1 ignored by community)',
+  })
+  isCommunityIgnored: boolean;
+
+  @ApiProperty({
+    description:
+      'True if badge belongs to the filtered candidate pool (§4.2.1: not all-earned, not unreachable, not expired)',
+  })
+  isCandidate: boolean;
+
+  @ApiProperty({
+    description:
+      'True if this badge has the lowest CII among active candidates',
   })
   isLowestCII: boolean;
 }
@@ -57,67 +67,118 @@ export class PlayerIndicatorDto {
   @ApiProperty({ description: 'Total lifetime check-in contributions' })
   totalContributions: number;
 
-  @ApiProperty({ description: 'Contributions count per period key' })
-  periodContributions: Record<number, number>;
+  @ApiProperty({
+    description: 'Badge IDs already earned by the player (B_p)',
+    type: [String],
+  })
+  earnedBadges: string[];
 
   @ApiProperty({
     description:
-      'Player Motivation Indicator (periods with growth/sustained activity)',
+      'Achievable Badges AB(p) [Def 3.1]: badge IDs whose prerequisites have been met',
+    type: [String],
   })
-  PMI: number;
+  achievableBadges: string[];
 
   @ApiProperty({
-    description: 'Relative PMI normalized against community average',
+    description:
+      'Ignored Badges ignored_by(p) [Def 3.3]: achievable unearned badges with i3(p, b) < threshold x',
+    type: [String],
   })
-  relPMI: number;
+  ignoredBadges: string[];
+
+  @ApiProperty({
+    description:
+      'Individual Interest Indicator i3(p, b) [Def 3.2] mapped by badgeId',
+  })
+  individualInterest: Record<string, number>;
 }
 
 export class CommunityIndicatorsResponseDto {
   @ApiProperty({ description: 'Project unique identifier' })
   projectId: string;
 
-  @ApiProperty({ description: 'Current evaluated period number s' })
-  currentPeriod: number;
-
-  @ApiProperty({
-    description: 'Timeline origin timestamp used for Period 1 (ISO-8601)',
-  })
-  startDate: string;
-
   @ApiProperty({
     description: 'Horizon timestamp used for evaluation (ISO-8601)',
   })
   asOfDate: string;
 
-  @ApiProperty({ description: 'Period length in days' })
-  daysPerPeriod: number;
+  @ApiProperty({
+    description:
+      'Reference threshold x used for ignored badges (Def 3.3) and adaptation trigger (§4.1)',
+  })
+  threshold: number;
 
   @ApiProperty({ description: 'Total registered players in project' })
   totalPlayers: number;
 
-  @ApiProperty({ description: 'Players with at least one contribution' })
+  @ApiProperty({
+    description: 'Active players meeting the contribution threshold',
+  })
   activePlayers: number;
 
   @ApiProperty({ description: 'Total valid contributions recorded' })
   totalContributions: number;
 
-  @ApiProperty({ description: 'Average PMI across community players' })
-  avgPMI: number;
+  @ApiProperty({
+    description:
+      'Section 4.1 Trigger status: true if there exists a candidate badge b with CII(b) < threshold x',
+  })
+  isTriggered: boolean;
+
+  @ApiProperty({
+    description: 'Candidate badge IDs triggering adaptation (CII(b) < x)',
+    type: [String],
+  })
+  triggerBadges: string[];
+
+  @ApiProperty({
+    description: 'Count of badges ignored by the community (CII(b) < x)',
+  })
+  communityIgnoredCount: number;
 
   @ApiProperty({
     description:
-      'Community Motivation Indicator (median relPMI across players)',
+      'Sum of |ignored_by(p)| across all players in the evaluated pool',
   })
-  CMI: number;
+  totalPlayerIgnored: number;
 
   @ApiProperty({
-    description: 'Badge indicators list sorted by CII ascending',
+    description:
+      'Section 4.2.1: Badge IDs earned by all evaluated players (assigned_badges)',
+    type: [String],
+  })
+  allPlayerBadges: string[];
+
+  @ApiProperty({
+    description:
+      'Section 4.2.1: Badge IDs unreachable by any evaluated player (unreachable_badges)',
+    type: [String],
+  })
+  unreachableBadges: string[];
+
+  @ApiProperty({
+    description:
+      'Section 4.2.1: Filtered candidate badge IDs eligible for vanishing selection',
+    type: [String],
+  })
+  candidateBadges: string[];
+
+  @ApiProperty({
+    description: 'Lowest CII value across badges with non-empty eligible pools',
+    nullable: true,
+  })
+  lowestCII: number | null;
+
+  @ApiProperty({
+    description: 'Badge indicators list',
     type: [BadgeIndicatorDto],
   })
   badges: BadgeIndicatorDto[];
 
   @ApiProperty({
-    description: 'Player motivation indicators',
+    description:
+      'Player indicators (AB(p), ignored_by(p), and individual interest i3)',
     type: [PlayerIndicatorDto],
   })
   players: PlayerIndicatorDto[];

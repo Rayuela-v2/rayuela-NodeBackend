@@ -46,8 +46,8 @@ flowchart TB
   end
 
   subgraph Ingestion["Aggregation & Context Layer"]
-    GIS["GamificationIndicatorsService<br/>(Date parsing & period partitioning)"]
-    CTX["IndicatorComputationContext<br/>(badges, players, checkins, periods)"]
+    GIS["GamificationIndicatorsService<br/>(Date & threshold validation)"]
+    CTX["IndicatorComputationContext<br/>(badges, players, checkins, threshold)"]
   end
 
   subgraph Strategy["Pluggable Strategy Engine"]
@@ -55,13 +55,13 @@ flowchart TB
     VBS["VanishingBadgesStrategy<br/>(Pure Mathematical Implementation)"]
   end
 
-  subgraph Metrics["Calculated Indicators"]
-    ET["ET_b: Estimated Awarding Time"]
-    I3["i_3: Individual Player Recency"]
-    CII["CII: Community Interest Indicator"]
-    PMI["PMI / relPMI: Player Motivation"]
-    CMI["CMI: Community Motivation Indicator"]
-    CAND["Adaptation Candidate (Lowest CII)"]
+  subgraph Metrics["Calculated Indicators (Sept 18 Revision)"]
+    AB["AB(p): Achievable Badges [Def 3.1]"]
+    I3["i_3(p, b): Individual Player Interest [Def 3.2]"]
+    IGN["ignored_by(p): Ignored Badges [Def 3.3]"]
+    CII["CII(b): Community Interest Indicator [Def 3.4]"]
+    FILT["Candidate Pool Filtering [§4.2.1]"]
+    TRIG["Adaptation Trigger & Candidate [§4.1-4.2]"]
   end
 
   subgraph Output["Output Response DTOs"]
@@ -85,30 +85,29 @@ flowchart TB
 | Rayuela Domain Entity / DAO | Input Role in Engine | Output Indicator |
 | :--- | :--- | :--- |
 | **`Project`** | Establishes the bounded community and context identifier. | `projectId` |
-| **`BadgeRule` (`GamificationDao`)** | Defines target requirements, current badge status (`active`, `faded`, `expired`), and prerequisite DAG relationships. | $ep(b)$ (eligible pool), Prerequisite chains |
+| **`BadgeRule` (`GamificationDao`)** | Defines target requirements, current badge status (`active`, `faded`, `expired`), and prerequisite DAG relationships. | $AB(p)$, $ep(b)$ (eligible pool), Candidate filtering (`allPlayerBadges`, `unreachableBadges`, `candidateBadges`) |
 | **`User` (`UserDao`)** | Supplies player join dates ($t_{\text{join}}$) and registered account profiles. | $t_0(p, b)$ (baseline date for root badges) |
-| **`Checkin` (`CheckInDao`)** | Provides timestamped citizen science contributions, partitioned into consecutive calendar periods $s_1, s_2, \dots, s_n$. | $cnum(p, s)$, $PMI(p)$, $relPMI(p)$, $CMI$ |
-| **`Move` (`MoveDao`)** | Records historical award events, tracking the exact contributions and timestamps at which players unlocked badges. | $U_b$ (earners set), $ET_b$, $t_0(p, b)$ for child badges |
+| **`Checkin` (`CheckInDao`)** | Provides timestamped citizen science contributions. | `totalContributions`, `activePlayers` |
+| **`Move` (`MoveDao`)** | Records historical award events, tracking the exact timestamps at which players unlocked badges. | $B_p$, $U_b$ (earners set), $t_0(p, b)$ for child badges |
 
 ---
 
-## 3. Mathematical Indicators Summary
+## 3. Mathematical Indicators Summary (Sept 18, 2026 Revision)
 
-The default implementation (`VanishingBadgesStrategy`) evaluates:
+The default implementation (`VanishingBadgesStrategy`) evaluates Definitions 3.1–3.4 and Section 4.1–4.2 of the Vanishing Badges specification:
 
-1. **Estimated Awarding Time ($ET_b$)**: Historical average check-ins required by players who earned badge $b$. Falls back to immediate prerequisite thresholds during cold starts.
-2. **Individual Recency Interest ($i_3(p, b)$)**: Measures how recently player $p$ became eligible for badge $b$:
-   $$\text{recency}(p, b) = \text{asOfDate} - t_0(p, b)$$
-   $$i_3(p, b) = \frac{1}{\text{recency}(p, b) + 1}$$
-   If badge $b$ is unachievable for player $p$ (unmet prerequisites), $i_3(p, b) = 1.0$.
-3. **Community Interest Indicator ($CII(b)$)**: The median individual interest across all players eligible to earn badge $b$ ($ep(b)$):
-   $$CII(b) = \text{median}(\{i_3(p, b) : p \in ep(b)\})$$
-   A declining $CII$ signals that eligible players are stalling and losing interest in badge $b$.
-4. **Player Motivation Indicator ($PMI(p)$)**: The number of periods where player $p$ sustained or increased contributions compared to the previous period:
-   $$cnum(p, s) \ge cnum(p, \text{prev}(s)) \land (cnum(p, s) + cnum(p, \text{prev}(s)) > 0)$$
-5. **Community Motivation Indicator ($CMI$)**: The median relative motivation across all active contributors:
-   $$\overline{PMI} = \frac{1}{|P|} \sum_{p \in P} PMI(p), \quad relPMI(p) = \frac{PMI(p)}{\overline{PMI}}, \quad CMI = \text{median}(\{relPMI(p) : p \in P\})$$
-6. **Adaptation Candidate Badge ($b^*$)**: Identifies the active badge with the lowest $CII$, representing the primary bottleneck where community interest has waned the most.
+1. **Achievable Badges ($AB(p)$ — Def 3.1)**: A badge is achievable to a player when all prerequisite badges (`previousBadges`) have been earned:
+   $$AB(p) = \{\, b \in \text{Badges} \mid \forall prev \in \text{prerequisites}(b),\, prev \in B_p \,\}$$
+2. **Individual Interest Indicator ($i_3(p, b)$ — Def 3.2)**: Measures the inverse of the elapsed time (in days) since player $p$ met the prerequisites for badge $b$ ($t_0(p, b)$):
+   $$i_3(p, b) = \begin{cases} \dfrac{1}{\text{now} - t_0(p, b)} & : b \in AB(p) \\ 1.0 & : b \notin AB(p) \end{cases}$$
+3. **Ignored Badges ($\text{ignored\_by}(p)$ — Def 3.3)**: The subset of achievable, unearned badges for player $p$ whose individual interest has fallen below reference threshold $x$ (default $x = 0.20$, equivalent to $> 5$ days elapsed):
+   $$\text{ignored\_by}(p) = \{\, b \in AB(p) \setminus B_p \mid i_3(p, b) < x \,\}$$
+4. **Community Interest Indicator ($CII(b)$ — Def 3.4)**: The median individual interest across all players eligible to earn badge $b$ ($ep(b) = \{\, p \in P \mid b \in AB(p) \setminus B_p \,\}$):
+   $$CII(b) = \text{median}(\{\, i_3(p, b) \mid p \in ep(b) \,\})$$
+5. **Candidate Filtering (§4.2.1)**: Excludes badges already earned by everyone in the community (`allPlayerBadges`), badges unreachable by anyone (`unreachableBadges`), and expired badges to yield `candidateBadges`.
+6. **Adaptation Trigger & Selection (§4.1 & §4.2.2–4.2.3)**:
+   $$\text{Trigger Adaptation} \iff \exists b \in \text{Candidates} : CII(b) < x$$
+   Candidate badges are sorted ascending by $CII(b)$ to identify the primary `adaptationCandidateBadge`.
 
 ---
 
@@ -117,20 +116,20 @@ The default implementation (`VanishingBadgesStrategy`) evaluates:
 ### Current State: On-Demand REST Endpoint
 The engine is currently exposed via an authenticated HTTP endpoint:
 ```http
-GET /v1/gamification-indicators/:projectId?startDate=01-07-2026&asOfDate=20-07-2026&daysPerPeriod=7
+GET /v1/gamification-indicators/:projectId?asOfDate=20-07-2026&threshold=0.20
 Authorization: Bearer <JWT_TOKEN>
 ```
 This allows:
-- Real-time exploration and parameter tuning (`daysPerPeriod`, custom `startDate`, point-in-time `asOfDate`).
+- Real-time exploration and parameter tuning (`threshold`, point-in-time `asOfDate`, `minActiveCheckins`).
 - Visual debugging through documentation tools and simulators.
-- Empirical verification of community health before enabling automated rule mutations.
+- Empirical verification of community interest before enabling automated rule mutations.
 
 ### Future State: Automated Badge Fading Adaptation Loop
 In upcoming phases, this engine will directly drive the **Badge Fading** adaptation strategy:
-1. A recurring cron worker periodically runs `calculateIndicators` for active projects.
-2. If community motivation drops below threshold ($CMI < \tau_{\text{trigger}}$), the adaptation pipeline is triggered.
+1. Periodically or upon check-in registration, the system runs `calculateIndicators` for active projects.
+2. If any candidate badge's community interest drops below threshold ($\exists b \in \text{Candidates} : CII(b) < x$), `isTriggered` becomes `true`.
 3. The engine selects the candidate badge with lowest interest ($b^* = \arg\min CII(b)$).
-4. The system automatically transitions badge $b^*$ to `faded` status with an expiration timestamp (`expiresAt`), broadcasting notifications to prompt community participation.
+4. The system automatically transitions badge $b^*$ to `faded` status with an expiration timestamp (`expiresAt`), broadcasting notifications to prompt community participation during the Step 5 running impact window.
 
 ---
 
@@ -142,35 +141,39 @@ In upcoming phases, this engine will directly drive the **Badge Fading** adaptat
 
 | Parameter | Type | Required | Default | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `startDate` | string | No | Earliest checkin | Timeline origin for Period 1. Accepts ISO-8601, `DD-MM-YYYY`, or `DD/MM/YYYY`. |
 | `asOfDate` | string | No | Now | Horizon timestamp. Accepts ISO-8601, `DD-MM-YYYY`, or `DD/MM/YYYY`. |
-| `daysPerPeriod` | number | No | `7` | Duration of each period $s$ in days (default: weekly). |
-| `minActiveCheckins` | number | No | `1` | Minimum contributions required to qualify as an active player. |
+| `threshold` | number | No | `0.2` | Reference threshold $x$ for ignored badges (Def 3.3) and adaptation trigger (§4.1). |
+| `minActiveCheckins` | number | No | `0` | Optional minimum contributions required to include a player in the evaluated pool $P$. |
 
 #### Sample Response (`200 OK`)
 
 ```json
 {
   "projectId": "67702f23258db9ef444b0e8b",
-  "currentPeriod": 3,
-  "startDate": "2026-07-01T00:00:00.000Z",
   "asOfDate": "2026-07-20T23:59:59.999Z",
-  "daysPerPeriod": 7,
-  "totalPlayers": 12,
+  "threshold": 0.2,
+  "totalPlayers": 10,
   "activePlayers": 8,
   "totalContributions": 45,
-  "avgPMI": 1.5,
-  "CMI": 1.0,
+  "isTriggered": true,
+  "triggerBadges": ["b-expert-mapper"],
+  "communityIgnoredCount": 1,
+  "totalPlayerIgnored": 4,
+  "allPlayerBadges": ["b-first-checkin"],
+  "unreachableBadges": ["b-master-scientist"],
+  "candidateBadges": ["b-expert-mapper"],
+  "lowestCII": 0.1429,
   "adaptationCandidateBadge": {
     "badgeId": "b-expert-mapper",
     "badgeName": "Mapeador Experto",
     "status": "active",
     "earnedCount": 1,
     "earnedUsers": ["user_101"],
-    "ET_b": 15.0,
     "eligibleCount": 4,
     "eligibleUsers": ["user_102", "user_103", "user_104", "user_105"],
-    "CII": 0.0526,
+    "CII": 0.1429,
+    "isCommunityIgnored": true,
+    "isCandidate": true,
     "isLowestCII": true
   },
   "badges": [
@@ -180,10 +183,11 @@ In upcoming phases, this engine will directly drive the **Badge Fading** adaptat
       "status": "active",
       "earnedCount": 1,
       "earnedUsers": ["user_101"],
-      "ET_b": 15.0,
       "eligibleCount": 4,
       "eligibleUsers": ["user_102", "user_103", "user_104", "user_105"],
-      "CII": 0.0526,
+      "CII": 0.1429,
+      "isCommunityIgnored": true,
+      "isCandidate": true,
       "isLowestCII": true
     }
   ],
@@ -191,13 +195,14 @@ In upcoming phases, this engine will directly drive the **Badge Fading** adaptat
     {
       "playerId": "user_102",
       "totalContributions": 7,
-      "periodContributions": {
-        "1": 2,
-        "2": 2,
-        "3": 3
-      },
-      "PMI": 2,
-      "relPMI": 1.333
+      "earnedBadges": ["b-first-checkin"],
+      "achievableBadges": ["b-first-checkin", "b-expert-mapper"],
+      "ignoredBadges": ["b-expert-mapper"],
+      "individualInterest": {
+        "b-first-checkin": 1.0,
+        "b-expert-mapper": 0.1429,
+        "b-master-scientist": 1.0
+      }
     }
   ]
 }

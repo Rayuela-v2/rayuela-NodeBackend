@@ -39,15 +39,19 @@ describe('GamificationIndicatorsService', () => {
     formulaStrategy = {
       calculateIndicators: jest.fn().mockReturnValue({
         projectId: 'proj1',
-        currentPeriod: 1,
-        startDate: new Date().toISOString(),
         asOfDate: new Date().toISOString(),
-        daysPerPeriod: 7,
+        threshold: 0.2,
         totalPlayers: 0,
         activePlayers: 0,
         totalContributions: 0,
-        avgPMI: 0,
-        CMI: 0,
+        isTriggered: false,
+        triggerBadges: [],
+        communityIgnoredCount: 0,
+        totalPlayerIgnored: 0,
+        allPlayerBadges: [],
+        unreachableBadges: [],
+        candidateBadges: [],
+        lowestCII: null,
         badges: [],
         players: [],
         adaptationCandidateBadge: null,
@@ -80,25 +84,24 @@ describe('GamificationIndicatorsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should throw BadRequestException if startDate is after asOfDate', async () => {
+  it('should throw BadRequestException if threshold is invalid or non-positive', async () => {
     await expect(
       service.computeIndicators('proj1', {
-        startDate: '25-07-2026',
-        asOfDate: '20-07-2026',
+        threshold: -0.1,
       }),
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should parse DD-MM-YYYY format for asOfDate and startDate', async () => {
+  it('should parse DD-MM-YYYY format for asOfDate and custom threshold', async () => {
     const res = await service.computeIndicators('proj1', {
-      startDate: '01-07-2026',
       asOfDate: '20-07-2026',
+      threshold: '0.25',
     });
     expect(res).toBeDefined();
     expect(formulaStrategy.calculateIndicators).toHaveBeenCalledWith(
       expect.objectContaining({
-        startDate: expect.any(Date),
         asOfDate: expect.any(Date),
+        threshold: 0.25,
       }),
     );
   });
@@ -141,8 +144,8 @@ describe('GamificationIndicatorsService', () => {
     ]);
 
     const result = await service.computeIndicators('proj1', {
-      daysPerPeriod: 7,
       asOfDate: '2026-06-15T00:00:00.000Z',
+      threshold: 0.2,
     });
 
     expect(gamificationDao.getGamificationByProjectId).toHaveBeenCalledWith(
