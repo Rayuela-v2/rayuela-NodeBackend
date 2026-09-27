@@ -22,16 +22,7 @@ export interface IndicatorFormulaStrategy {
   ): CommunityIndicatorResult;
 
   /**
-   * Definition 3.1: Estimated Awarding Time (ET_b).
-   * Historical average of contributions at award time for players who earned badge b.
-   */
-  computeEstimatedAwardingTime(
-    badge: BadgeDefinition,
-    allBadges: BadgeDefinition[],
-    earnedPlayers: { playerId: string; contribsAtEarn: number }[],
-  ): number;
-
-  /**
+   * Definition 3.1: Achievable Badges AB(p) & t_0(p, b).
    * Evaluates if badge b is achievable by player p (all prerequisites met)
    * and calculates t_0(p, b), the timestamp when badge b became achievable.
    */
@@ -43,7 +34,7 @@ export interface IndicatorFormulaStrategy {
   ): { isAchievable: boolean; t0Date: Date };
 
   /**
-   * Definition 3.2: Individual Interest Indicator i3(p, b).
+   * Definition 3.2: Individual Interest Indicator i_3(p, b).
    * 1 / (now - t0) for achievable badges; 1.0 if not achievable.
    */
   computeIndividualInterest(
@@ -55,29 +46,20 @@ export interface IndicatorFormulaStrategy {
   ): number;
 
   /**
-   * Definition 3.3: Community Interest Indicator CII(b).
-   * Median of i3(p, b) across all eligible players ep(b).
+   * Definition 3.3: Ignored Badges ignored_by(p).
+   * ignored_by(p) = { b in AB(p) - B_p : i_3(p, b) < x }
+   */
+  computeIgnoredBadges(
+    achievableBadgeIds: string[],
+    earnedBadgeIds: Set<string>,
+    playerI3Map: Record<string, number>,
+    threshold: number,
+  ): string[];
+
+  /**
+   * Definition 3.4: Community Interest Indicator CII(b).
+   * Median of i_3(p, b) across all eligible players ep(b) = { p in P : b in AB(p) - B_p }.
    * Returns null if eligible pool is empty.
    */
   computeCommunityInterest(eligibleI3Values: number[]): number | null;
-
-  /**
-   * Definition 3.4: Player Motivation Indicator PMI(p).
-   * Counts periods s in S where contributions grew or held steady with non-zero activity.
-   */
-  computePlayerMotivation(
-    periodContributions: Record<number, number>,
-    currentPeriod: number,
-  ): number;
-
-  /**
-   * Definitions 3.4 & 3.5: Relative PMI and Community Motivation Indicator (CMI).
-   * relPMI(p) = PMI(p) / avgPMI
-   * CMI = median({ relPMI(p) : p in P })
-   */
-  computeCommunityMotivation(playerPMIs: { playerId: string; pmi: number }[]): {
-    avgPMI: number;
-    playerRelPMIs: Record<string, number>;
-    CMI: number;
-  };
 }

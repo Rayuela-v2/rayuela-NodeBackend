@@ -11,38 +11,46 @@ import {
 } from './indicator.types';
 
 /**
- * Standard implementation of the vanishing badges indicator framework:
- * Adaptive Gamification Mechanism for Citizen Science platforms.
+ * Standard implementation of the Vanishing Badges indicator framework (Sept 18, 2026 Revision):
+ * Adaptive Gamification Mechanism for Citizen Science platforms (Torres & Dalponte Ayastuy).
  *
- * Encapsulates Definitions 3.1 through 3.5 as pure, stateless mathematical operations.
+ * Encapsulates Definitions 3.1 through 3.4 and Section 4.1–4.2 heuristic pipeline
+ * as pure, stateless mathematical operations:
+ * - Def 3.1: Achievable Badges AB(p)
+ * - Def 3.2: Individual Interest Indicator i_3(p, b)
+ * - Def 3.3: Ignored Badges ignored_by(p)
+ * - Def 3.4: Community Interest Indicator CII(b)
+ * - §4.1: Adaptation Trigger (exists b in Candidates : CII(b) < x)
+ * - §4.2: Candidate Badge Filtering, Sorting & Selection
  */
 @Injectable()
 export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
+  /** Default reference threshold x (e.g., 0.20 <=> 5 days elapsed without earning) */
+  private static readonly DEFAULT_THRESHOLD_X = 0.2;
+
   /**
    * Orchestrates the complete indicator calculation pipeline.
    *
-   * 1. Sorts and segments checkins into periods s in S based on `daysPerPeriod`.
-   * 2. Resolves earned badge state and historical contributions at time of award.
-   * 3. Calculates t_0(p, b) and achievability for each player and badge.
-   * 4. Calculates individual interest i_3(p, b) [Def 3.2].
-   * 5. Computes badge-level metrics ET_b [Def 3.1] and CII(b) [Def 3.3].
-   * 6. Computes player-level motivation PMI(p), relPMI(p) [Def 3.4], and CMI [Def 3.5].
-   * 7. Identifies the lowest CII candidate badge for adaptation recommendation.
+   * 1. Filters and sorts check-ins up to `asOfDate`, resolving cumulative contributions
+   *    and earned badges B_p per player.
+   * 2. Determines the evaluated player pool P (optionally filtered by `minActiveCheckins`).
+   * 3. Computes Achievable Badges AB(p) and t_0(p, b) [Def 3.1].
+   * 4. Computes Individual Interest i_3(p, b) [Def 3.2] and Ignored Badges ignored_by(p) [Def 3.3].
+   * 5. Computes Eligible Players ep(b) and Community Interest CII(b) [Def 3.4].
+   * 6. Applies Candidate Badge Filtering (§4.2.1: excluding all-earned, unreachable, and expired badges).
+   * 7. Evaluates Adaptation Trigger (§4.1: exists b : CII(b) < x) and ranks candidate badges (§4.2.2).
    */
   calculateIndicators(
     ctx: IndicatorComputationContext,
   ): CommunityIndicatorResult {
-    const {
-      projectId,
-      badges,
-      players,
-      checkins,
-      startDate,
-      asOfDate,
-      daysPerPeriod,
-    } = ctx;
+    const { projectId, badges, players, checkins, asOfDate } = ctx;
 
-    // Filter checkins up to asOfDate
+    const threshold =
+      ctx.threshold !== undefined && Number(ctx.threshold) > 0
+        ? Number(ctx.threshold)
+        : VanishingBadgesStrategy.DEFAULT_THRESHOLD_X;
+
+    // 1. Filter check-ins up to asOfDate and sort chronologically
     const validCheckins = checkins
       .filter((c) => new Date(c.datetime).getTime() <= asOfDate.getTime())
       .sort(
@@ -50,34 +58,7 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
           new Date(a.datetime).getTime() - new Date(b.datetime).getTime(),
       );
 
-    /**
-     * Timeline Origin Determination for Period Partitioning (Period 1, 2, ...):
-     *
-     * - IF `startDate` IS PROVIDED:
-     *   The timeline explicitly anchors to `startDate`. Period 1 begins on `startDate`.
-     *   Contributions occurring prior to `startDate` are excluded from period-over-period
-     *   motivation (PMI) evaluation.
-     *
-     * - IF `startDate` IS NOT PROVIDED (Default Behavior):
-     *   The engine dynamically detects the earliest recorded check-in across the project
-     *   (`validCheckins[0].datetime`). Period 1 begins at the exact moment the community
-     *   started contributing. If no check-ins exist yet (cold start), it defaults to `asOfDate`.
-     */
-    const timelineStart = startDate
-      ? new Date(startDate).getTime()
-      : validCheckins.length > 0
-        ? new Date(validCheckins[0].datetime).getTime()
-        : asOfDate.getTime();
-
-    const periodMs = Math.max(1, daysPerPeriod) * 24 * 60 * 60 * 1000;
-    const currentPeriod = Math.max(
-      1,
-      Math.ceil((asOfDate.getTime() - timelineStart + 1) / periodMs),
-    );
-
-    // 1. Group contributions per player and per period
     const playerTotalContribs: Record<string, number> = {};
-    const playerPeriodContribs: Record<string, Record<number, number>> = {};
     const playerEarnedBadgesMap: Map<
       string,
       Map<string, PlayerEarnedBadge>
@@ -85,29 +66,19 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
 
     players.forEach((p) => {
       playerTotalContribs[p.id] = 0;
-      playerPeriodContribs[p.id] = {};
       playerEarnedBadgesMap.set(p.id, new Map(p.earnedBadges || []));
     });
 
     validCheckins.forEach((c) => {
       const pId = c.userId;
-      if (!playerPeriodContribs[pId]) {
+      if (playerTotalContribs[pId] === undefined) {
         playerTotalContribs[pId] = 0;
-        playerPeriodContribs[pId] = {};
         playerEarnedBadgesMap.set(pId, new Map());
       }
 
       playerTotalContribs[pId] = (playerTotalContribs[pId] || 0) + 1;
-      const checkinTime = new Date(c.datetime).getTime();
-      if (checkinTime >= timelineStart) {
-        const s = Math.max(
-          1,
-          Math.ceil((checkinTime - timelineStart + 1) / periodMs),
-        );
-        playerPeriodContribs[pId][s] = (playerPeriodContribs[pId][s] || 0) + 1;
-      }
 
-      // Track newly awarded badges if present on checkin
+      // Track newly awarded badges if present on check-in
       if (c.newBadges && c.newBadges.length > 0) {
         c.newBadges.forEach((badgeRef) => {
           const matchedBadge = badges.find(
@@ -127,17 +98,37 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       }
     });
 
-    // 2. Compute achievability and t_0(p, b) for every player and badge
+    // 2. Determine evaluated player pool P based on optional minActiveCheckins filter
+    const minCheckins =
+      ctx.minActiveCheckins !== undefined && Number(ctx.minActiveCheckins) > 0
+        ? Number(ctx.minActiveCheckins)
+        : 0;
+
+    const evaluatedPlayers =
+      minCheckins > 0
+        ? players.filter((p) => (playerTotalContribs[p.id] || 0) >= minCheckins)
+        : players;
+
+    const activePlayersCount =
+      minCheckins > 0
+        ? evaluatedPlayers.length
+        : players.filter((p) => (playerTotalContribs[p.id] || 0) >= 1).length;
+
+    // 3. Compute AB(p) [Def 3.1], t_0(p, b), i_3(p, b) [Def 3.2], and ignored_by(p) [Def 3.3]
     const playerBadgeT0: Record<string, Record<string, Date>> = {};
     const playerBadgeAchievable: Record<string, Record<string, boolean>> = {};
     const playerBadgeI3: Record<string, Record<string, number>> = {};
+    const playerABList: Record<string, string[]> = {};
+    const playerIgnoredList: Record<string, string[]> = {};
 
     players.forEach((p) => {
       playerBadgeT0[p.id] = {};
       playerBadgeAchievable[p.id] = {};
       playerBadgeI3[p.id] = {};
+      playerABList[p.id] = [];
 
       const earned = playerEarnedBadgesMap.get(p.id) || new Map();
+      const earnedIds = new Set<string>(earned.keys());
 
       badges.forEach((b) => {
         const { isAchievable, t0Date } = this.computeAchievabilityAndT0(
@@ -148,6 +139,10 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
         );
         playerBadgeAchievable[p.id][b.id] = isAchievable;
         playerBadgeT0[p.id][b.id] = t0Date;
+
+        if (isAchievable) {
+          playerABList[p.id].push(b.id);
+        }
 
         const isEarned = earned.has(b.id);
         const earnedDate = isEarned ? earned.get(b.id)!.earnedAt : null;
@@ -160,26 +155,34 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
           asOfDate,
         );
       });
+
+      playerIgnoredList[p.id] = this.computeIgnoredBadges(
+        playerABList[p.id],
+        earnedIds,
+        playerBadgeI3[p.id],
+        threshold,
+      );
     });
 
-    // 3. Compute badge metrics: ET_b, eligible pool ep(b), and CII(b)
+    // 4. Section 4.2.1 Candidate Filtering (over evaluatedPlayers pool P)
+    // all_player_badges = assigned_badges(players, badges) (earned by everyone in P)
+    // unreachable_badges = unreachable_badges(players, badges) (no player in P has b in AB(p))
+    const allPlayerBadges: string[] = [];
+    const unreachableBadges: string[] = [];
+    const candidateBadges: string[] = [];
+
+    // 5. Compute badge metrics: U_b, eligible pool ep(b), and CII(b) [Def 3.4]
+    let lowestCII: number | null = null;
+    let communityIgnoredCount = 0;
+
     const badgeMetrics: BadgeIndicatorResult[] = badges.map((b) => {
-      // U_b: Players who have earned badge b
-      const UbPlayers: { playerId: string; contribsAtEarn: number }[] = [];
-      players.forEach((p) => {
-        const earned = playerEarnedBadgesMap.get(p.id);
-        if (earned && earned.has(b.id)) {
-          UbPlayers.push({
-            playerId: p.id,
-            contribsAtEarn: earned.get(b.id)!.contribsAtEarn,
-          });
-        }
-      });
+      // U_b: Players in P who have earned badge b
+      const UbPlayers = evaluatedPlayers.filter((p) =>
+        playerEarnedBadgesMap.get(p.id)?.has(b.id),
+      );
 
-      const ET_b = this.computeEstimatedAwardingTime(b, badges, UbPlayers);
-
-      // ep(b): Eligible players who can achieve b but have NOT earned it yet
-      const eligiblePlayers = players.filter((p) => {
+      // ep(b) = { p in P : b in AB(p) - B_p }
+      const eligiblePlayers = evaluatedPlayers.filter((p) => {
         const isAchievable = playerBadgeAchievable[p.id]?.[b.id] ?? false;
         const hasEarned = playerEarnedBadgesMap.get(p.id)?.has(b.id) ?? false;
         return isAchievable && !hasEarned;
@@ -190,54 +193,62 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       );
       const CII = this.computeCommunityInterest(eligibleI3Values);
 
+      if (CII !== null && (lowestCII === null || CII < lowestCII)) {
+        lowestCII = CII;
+      }
+
+      const isCommunityIgnored = CII !== null && CII < threshold;
+      if (isCommunityIgnored) {
+        communityIgnoredCount++;
+      }
+
+      const isAllEarned =
+        evaluatedPlayers.length > 0 &&
+        UbPlayers.length === evaluatedPlayers.length;
+      const canAnyoneAchieve = evaluatedPlayers.some(
+        (p) => playerBadgeAchievable[p.id]?.[b.id] ?? false,
+      );
+      const isUnreachable = !canAnyoneAchieve;
+      const isExpired = b.status === 'expired';
+
+      if (isAllEarned) {
+        allPlayerBadges.push(b.id);
+      }
+      if (isUnreachable) {
+        unreachableBadges.push(b.id);
+      }
+
+      const isCandidate = !isAllEarned && !isUnreachable && !isExpired;
+      if (isCandidate) {
+        candidateBadges.push(b.id);
+      }
+
       return {
         badgeId: b.id,
         badgeName: b.name,
         status: b.status,
         earnedCount: UbPlayers.length,
-        earnedUsers: UbPlayers.map((u) => u.playerId),
-        ET_b,
+        earnedUsers: UbPlayers.map((u) => u.id),
         eligibleCount: eligiblePlayers.length,
         eligibleUsers: eligiblePlayers.map((p) => p.id),
         CII,
+        isCommunityIgnored,
+        isCandidate,
         isLowestCII: false,
       };
     });
 
-    const minCheckins =
-      ctx.minActiveCheckins !== undefined && Number(ctx.minActiveCheckins) > 0
-        ? Number(ctx.minActiveCheckins)
-        : 1;
+    // 6. Section 4.1 Trigger Condition:
+    // Adaptation is triggered when a candidate badge has CII(b) < x
+    const triggerBadges = badgeMetrics
+      .filter((b) => b.isCandidate && b.CII !== null && b.CII < threshold)
+      .map((b) => b.badgeId);
+    const isTriggered = triggerBadges.length > 0;
 
-    // 4. Compute Player Motivation Indicator PMI(p) and relative relPMI(p)
-    const allPlayerPMIs = players.map((p) => {
-      const pmi = this.computePlayerMotivation(
-        playerPeriodContribs[p.id] || {},
-        currentPeriod,
-      );
-      return { playerId: p.id, pmi };
-    });
-
-    // P: set of active players meeting the minActiveCheckins threshold
-    const activePlayerPMIs = allPlayerPMIs.filter(
-      (item) => (playerTotalContribs[item.playerId] || 0) >= minCheckins,
-    );
-
-    const { avgPMI, playerRelPMIs, CMI } =
-      this.computeCommunityMotivation(activePlayerPMIs);
-
-    const playerResults: PlayerIndicatorResult[] = players.map((p) => ({
-      playerId: p.id,
-      totalContributions: playerTotalContribs[p.id] || 0,
-      periodContributions: playerPeriodContribs[p.id] || {},
-      PMI: allPlayerPMIs.find((item) => item.playerId === p.id)?.pmi || 0,
-      relPMI: playerRelPMIs[p.id] || 0.0,
-    }));
-
-    // 5. Rank candidate badges by ascending CII to determine adaptation candidate
-    // Candidate badges must be 'active' and have an active eligible pool (CII !== null)
+    // 7. Section 4.2.2 Sorting & Selection:
+    // Rank active candidate badges by ascending CII(b) to identify adaptation candidate
     const rankedCandidates = badgeMetrics
-      .filter((b) => b.status === 'active' && b.CII !== null)
+      .filter((b) => b.status === 'active' && b.isCandidate && b.CII !== null)
       .sort((a, b) => (a.CII ?? 999) - (b.CII ?? 999));
 
     const topCandidate =
@@ -251,19 +262,38 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       }
     }
 
-    const activePlayersCount = activePlayerPMIs.length;
+    // Build player indicator results for the evaluated player pool P
+    let totalPlayerIgnored = 0;
+    const playerResults: PlayerIndicatorResult[] = evaluatedPlayers.map((p) => {
+      const earned = playerEarnedBadgesMap.get(p.id) || new Map();
+      const ignored = playerIgnoredList[p.id] || [];
+      totalPlayerIgnored += ignored.length;
+
+      return {
+        playerId: p.id,
+        totalContributions: playerTotalContribs[p.id] || 0,
+        earnedBadges: Array.from(earned.keys()),
+        achievableBadges: playerABList[p.id] || [],
+        ignoredBadges: ignored,
+        individualInterest: playerBadgeI3[p.id] || {},
+      };
+    });
 
     return {
       projectId,
-      currentPeriod,
-      startDate: new Date(timelineStart).toISOString(),
       asOfDate: asOfDate.toISOString(),
-      daysPerPeriod,
+      threshold,
       totalPlayers: players.length,
       activePlayers: activePlayersCount,
       totalContributions: validCheckins.length,
-      avgPMI,
-      CMI,
+      isTriggered,
+      triggerBadges,
+      communityIgnoredCount,
+      totalPlayerIgnored,
+      allPlayerBadges,
+      unreachableBadges,
+      candidateBadges,
+      lowestCII,
       badges: badgeMetrics,
       players: playerResults,
       adaptationCandidateBadge: topCandidate,
@@ -271,56 +301,17 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
   }
 
   /**
-   * Definition 3.1: Estimated Awarding Time (ET_b)
+   * Definition 3.1: Achievable Badges AB(p) and t_0(p, b).
    *
    * Formula:
-   *   ET_b = (1 / |U_b|) * SUM_{p in U_b} (cnum(p, t_earned(p, b)))
+   *   AB(p) = { b in Badges | forall prev in prerequisites(b), prev in B_p }
    *
    * Explanation:
-   *   Represents the historical average number of check-ins/contributions a player
-   *   accumulated at the exact moment they earned badge b.
-   *
-   * Fallback:
-   *   When |U_b| = 0 (cold start / no player has unlocked the badge yet),
-   *   the estimate defaults to the sum of the badge's required check-ins plus
-   *   the required check-ins of all its direct prerequisites.
-   */
-  computeEstimatedAwardingTime(
-    badge: BadgeDefinition,
-    allBadges: BadgeDefinition[],
-    earnedPlayers: { playerId: string; contribsAtEarn: number }[],
-  ): number {
-    if (earnedPlayers.length > 0) {
-      const sum = earnedPlayers.reduce((acc, p) => acc + p.contribsAtEarn, 0);
-      return parseFloat((sum / earnedPlayers.length).toFixed(2));
-    }
-
-    // Cold-start fallback: required checkins + direct prerequisite requirements
-    let fallback = badge.reqCheckins;
-    (badge.previousBadges || []).forEach((prevRef) => {
-      const prevBadge = allBadges.find(
-        (b) => b.id === prevRef || b.name === prevRef,
-      );
-      if (prevBadge) {
-        fallback += prevBadge.reqCheckins;
-      }
-    });
-
-    return parseFloat(fallback.toFixed(2));
-  }
-
-  /**
-   * Computes Achievability and t_0(p, b) for a player and badge.
-   *
-   * Definition:
-   *   t_0(p, b) represents the moment in time when badge b became available/achievable
-   *   for player p:
+   *   A badge is achievable to a player when all the previous badges (prerequisites)
+   *   have been earned.
+   *   t_0(p, b) represents the timestamp when badge b became achievable for player p:
    *   - Root badges (no prerequisites): t_0 = player's join date.
    *   - Child badges: t_0 = MAX(earnedAt(prereq)) across all direct prerequisites.
-   *
-   * Achievability:
-   *   A badge is achievable for player p if and only if all prerequisite badges
-   *   specified in `previousBadges` have been completed.
    */
   computeAchievabilityAndT0(
     player: PlayerProfile,
@@ -338,7 +329,6 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
     // Check if every prerequisite badge has been earned
     let maxEarnedDate = player.joinDate;
     for (const prereqRef of prereqs) {
-      // Resolve prerequisite badge by id or name
       const prereqDef = allBadges.find(
         (b) => b.id === prereqRef || b.name === prereqRef,
       );
@@ -346,7 +336,7 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
       const earnedInfo = earnedBadges.get(prereqId);
 
       if (!earnedInfo) {
-        // Prerequisite missing: badge is locked/unachievable
+        // Prerequisite missing: badge is locked/unachievable (b not in AB(p))
         return { isAchievable: false, t0Date: player.joinDate };
       }
 
@@ -362,13 +352,13 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
    * Definition 3.2: Individual Interest Indicator i_3(p, b)
    *
    * Formula:
-   *   i_3(p, b) = 1.0 / (now - t_0(p, b))   if badge b is achievable
-   *   i_3(p, b) = 1.0                      if badge b is NOT achievable (locked)
+   *   i_3(p, b) = 1.0 / (now - t_0(p, b))   if b in AB(p) (b is achievable by p)
+   *   i_3(p, b) = 1.0                       if b not in AB(p) (b is not achievable by p)
    *
    * Explanation:
-   *   Captures the urgency/momentum of player p towards badge b. As elapsed days
-   *   grow without earning the badge, i_3 decays towards 0, reflecting waning interest
-   *   or a bottleneck. If already earned, elapsed days is fixed to (earnedAt - t_0).
+   *   Captures the inverse of the time elapsed since the prerequisites for badge b
+   *   were met by player p (t_0). As elapsed days grow without earning the badge,
+   *   i_3 decays towards 0, reflecting waning interest.
    *
    * Note on Units:
    *   Elapsed time is measured in whole days (minimum 1 day to prevent division by zero).
@@ -401,15 +391,40 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
   }
 
   /**
-   * Definition 3.3: Community Interest Indicator CII(b)
+   * Definition 3.3: Ignored Badges ignored_by(p)
+   *
+   * Formula:
+   *   ignored_by(p) = { b in AB(p) - B_p : i_3(p, b) < x }
+   *
+   * Explanation:
+   *   The set of ignored badges by a player p is a subset of AB(p) that have not
+   *   yet been earned (AB(p) - B_p) whose individual interest i_3 is below threshold x.
+   */
+  computeIgnoredBadges(
+    achievableBadgeIds: string[],
+    earnedBadgeIds: Set<string>,
+    playerI3Map: Record<string, number>,
+    threshold: number,
+  ): string[] {
+    return achievableBadgeIds.filter((badgeId) => {
+      if (earnedBadgeIds.has(badgeId)) {
+        return false;
+      }
+      const i3 = playerI3Map[badgeId] ?? 1.0;
+      return i3 < threshold;
+    });
+  }
+
+  /**
+   * Definition 3.4: Community Interest Indicator CII(b)
    *
    * Formula:
    *   CII(b) = median({ i_3(p, b) : p in ep(b) })
-   *   where ep(b) = { p in P : b is achievable for p AND p has not earned b }
+   *   where ep(b) = { p in P : b in AB(p) - B_p }
    *
    * Explanation:
-   *   Aggregates the median interest across all players who actively could earn badge b
-   *   right now. Low CII(b) identifies badges that players have unlocked but are neglecting.
+   *   Aggregates the median individual interest across all players who are currently
+   *   eligible for badge b. Low CII(b) (< x) identifies badges ignored by the community (§4.1).
    *
    * Edge Cases:
    *   If ep(b) is empty (no player currently eligible), returns null.
@@ -421,91 +436,6 @@ export class VanishingBadgesStrategy implements IndicatorFormulaStrategy {
 
     const medianVal = this.computeMedian(eligibleI3Values);
     return parseFloat(medianVal.toFixed(4));
-  }
-
-  /**
-   * Definition 3.4: Player Motivation Indicator PMI(p)
-   *
-   * Formula:
-   *   PMI(p) = SUM_{s in S} [ cnum(p, s) >= cnum(p, prev(s)) AND (cnum(p, s) + cnum(p, prev(s)) > 0) ]
-   *
-   * Explanation:
-   *   Measures consistency of player engagement across periods s in S.
-   *   A period awards +1 point if the player made contributions and their volume
-   *   did not drop compared to the preceding period (prev(s)).
-   */
-  computePlayerMotivation(
-    periodContributions: Record<number, number>,
-    currentPeriod: number,
-  ): number {
-    let pmiCount = 0;
-
-    for (let s = 1; s <= currentPeriod; s++) {
-      const currC = periodContributions[s] || 0;
-      const prevC = s > 1 ? periodContributions[s - 1] || 0 : 0;
-
-      // Both zero -> inactive period, no point
-      if (currC + prevC > 0) {
-        if (currC >= prevC) {
-          pmiCount++;
-        }
-      }
-    }
-
-    return pmiCount;
-  }
-
-  /**
-   * Definitions 3.4 & 3.5: Relative Motivation relPMI(p) and Community Motivation Indicator CMI
-   *
-   * Formulas:
-   *   avgPMI = (1 / |P|) * SUM_{p in P} PMI(p)
-   *   relPMI(p) = PMI(p) / avgPMI
-   *   CMI = median({ relPMI(p) : p in P })
-   *
-   * Explanation:
-   *   relPMI normalizes individual motivation against the community standard.
-   *   CMI takes the community median. A drop in CMI below 1.0 indicates community-wide
-   *   motivation decay, triggering the vanishing badge adaptation heuristic (§4).
-   *
-   * Edge Case Handling:
-   *   If avgPMI = 0 (community cold start or complete inactivity), relPMI evaluates
-   *   to 0.0 for inactive players, preventing division-by-zero or NaN values.
-   */
-  computeCommunityMotivation(playerPMIs: { playerId: string; pmi: number }[]): {
-    avgPMI: number;
-    playerRelPMIs: Record<string, number>;
-    CMI: number;
-  } {
-    const totalPlayers = playerPMIs.length;
-    if (totalPlayers === 0) {
-      return { avgPMI: 0, playerRelPMIs: {}, CMI: 0.0 };
-    }
-
-    const totalPMI = playerPMIs.reduce((acc, item) => acc + item.pmi, 0);
-    const avgPMI = totalPMI / totalPlayers;
-
-    const playerRelPMIs: Record<string, number> = {};
-
-    playerPMIs.forEach((item) => {
-      if (avgPMI > 0) {
-        playerRelPMIs[item.playerId] = parseFloat(
-          (item.pmi / avgPMI).toFixed(3),
-        );
-      } else {
-        // Cold start fallback: 1.0 if player alone has activity, else 0.0
-        playerRelPMIs[item.playerId] = item.pmi > 0 ? 1.0 : 0.0;
-      }
-    });
-
-    const relValues = playerPMIs.map((item) => playerRelPMIs[item.playerId]);
-    const medianCMI = this.computeMedian(relValues);
-
-    return {
-      avgPMI: parseFloat(avgPMI.toFixed(2)),
-      playerRelPMIs,
-      CMI: isNaN(medianCMI) ? 0.0 : parseFloat(medianCMI.toFixed(3)),
-    };
   }
 
   /**

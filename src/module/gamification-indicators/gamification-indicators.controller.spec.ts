@@ -12,15 +12,19 @@ describe('GamificationIndicatorsController', () => {
 
   const mockResponse: CommunityIndicatorsResponseDto = {
     projectId: 'proj1',
-    currentPeriod: 2,
-    startDate: '2026-06-01T00:00:00.000Z',
     asOfDate: '2026-06-15T00:00:00.000Z',
-    daysPerPeriod: 7,
+    threshold: 0.2,
     totalPlayers: 10,
     activePlayers: 5,
     totalContributions: 25,
-    avgPMI: 1.8,
-    CMI: 1.1,
+    isTriggered: false,
+    triggerBadges: [],
+    communityIgnoredCount: 0,
+    totalPlayerIgnored: 0,
+    allPlayerBadges: [],
+    unreachableBadges: [],
+    candidateBadges: [],
+    lowestCII: null,
     badges: [],
     players: [],
     adaptationCandidateBadge: null,
@@ -57,12 +61,12 @@ describe('GamificationIndicatorsController', () => {
 
   it('should return indicators from service', async () => {
     const result = await controller.getIndicators('proj1', {
-      daysPerPeriod: 7,
+      threshold: 0.2,
       asOfDate: '2026-06-15T00:00:00.000Z',
     });
 
     expect(service.computeIndicators).toHaveBeenCalledWith('proj1', {
-      daysPerPeriod: 7,
+      threshold: 0.2,
       asOfDate: '2026-06-15T00:00:00.000Z',
     });
     expect(result).toEqual(mockResponse);

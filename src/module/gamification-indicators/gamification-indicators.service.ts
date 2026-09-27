@@ -43,16 +43,19 @@ export class GamificationIndicatorsService {
     projectId: string,
     query?: GetIndicatorsQueryDto,
   ): Promise<CommunityIndicatorsResponseDto> {
-    const daysPerPeriod = Math.max(1, Number(query?.daysPerPeriod) || 7);
-    const startDate = query?.startDate
-      ? this.parseDate(query.startDate, 'start', 'startDate')
-      : undefined;
     const asOfDate = query?.asOfDate
       ? this.parseDate(query.asOfDate, 'end', 'asOfDate')
       : new Date();
 
-    if (startDate && startDate.getTime() > asOfDate.getTime()) {
-      throw new BadRequestException('startDate cannot be after asOfDate');
+    let threshold = 0.2;
+    if (query?.threshold !== undefined && query?.threshold !== '') {
+      const parsedThreshold = Number(query.threshold);
+      if (isNaN(parsedThreshold) || parsedThreshold <= 0) {
+        throw new BadRequestException(
+          `Invalid threshold value: "${query.threshold}". Must be a positive number (e.g. 0.20).`,
+        );
+      }
+      threshold = parsedThreshold;
     }
 
     // 1. Fetch project gamification rules
@@ -162,9 +165,10 @@ export class GamificationIndicatorsService {
       };
     });
 
-    const minActiveCheckins = query.minActiveCheckins
-      ? parseInt(String(query.minActiveCheckins), 10)
-      : 1;
+    const minActiveCheckins =
+      query?.minActiveCheckins !== undefined
+        ? parseInt(String(query.minActiveCheckins), 10)
+        : 0;
 
     // 5. Build computation context and delegate to formula strategy
     const ctx: IndicatorComputationContext = {
@@ -172,10 +176,9 @@ export class GamificationIndicatorsService {
       badges,
       players,
       checkins,
-      startDate,
       asOfDate,
-      daysPerPeriod,
-      minActiveCheckins: isNaN(minActiveCheckins) ? 1 : minActiveCheckins,
+      threshold,
+      minActiveCheckins: isNaN(minActiveCheckins) ? 0 : minActiveCheckins,
     };
 
     return this.formulaStrategy.calculateIndicators(ctx);

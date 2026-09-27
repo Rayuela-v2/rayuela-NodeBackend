@@ -19,13 +19,14 @@ export class GamificationIndicatorsController {
 
   /**
    * Triggers the calculation of adaptive gamification indicators for a project.
-   * Computes community metrics (CMI, avgPMI) and badge metrics (CII, ET_b).
+   * Computes player metrics (AB(p), i3(p,b), ignored_by(p)), badge metrics (CII(b)),
+   * and §4.1/§4.2 vanishing badge adaptation triggers.
    * Restricted to administrators to protect volunteer behavioral telemetry.
    */
   @Get(':projectId')
   @ApiOperation({
     summary:
-      'Calculates and returns adaptive gamification indicators (CII, CMI, ET_b) for a project',
+      'Calculates and returns adaptive gamification indicators (AB, i3, ignored_by, CII) for a project',
   })
   @ApiResponse({
     status: 200,
