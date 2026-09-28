@@ -207,3 +207,51 @@ In upcoming phases, this engine will directly drive the **Badge Fading** adaptat
   ]
 }
 ```
+
+---
+
+### `GET /v1/gamification-indicators/:projectId/timeline`
+
+Calculates and returns chronological snapshots of Community Interest ($CII(b)$) for all project badges over a selectable historical date window.
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `startDate` | string | No | 30 days before `endDate` | Window start date. Accepts ISO-8601, `DD-MM-YYYY`, or `DD/MM/YYYY`. |
+| `endDate` | string | No | Now | Window end date. Accepts ISO-8601, `DD-MM-YYYY`, or `DD/MM/YYYY`. |
+| `stepDays` | number | No | Dynamic (~15–30 points) | Sampling interval in days between snapshots (e.g. `1` for daily, `7` for weekly). |
+| `threshold` | number | No | `0.2` | Reference threshold $x$ for ignored badges and adaptation trigger. |
+| `badgeId` | string | No | All badges | Optional filter to return timeseries for a specific badge ID. |
+| `minActiveCheckins` | number | No | `0` | Minimum contributions required to include players in evaluated pool $P$. |
+
+#### Sample Response (`200 OK`)
+
+```json
+{
+  "projectId": "67702f23258db9ef444b0e8b",
+  "threshold": 0.2,
+  "startDate": "2026-06-01T00:00:00.000Z",
+  "endDate": "2026-07-01T23:59:59.999Z",
+  "stepDays": 7,
+  "timestamps": [
+    "2026-06-01T00:00:00.000Z",
+    "2026-06-08T00:00:00.000Z",
+    "2026-06-15T00:00:00.000Z",
+    "2026-06-22T00:00:00.000Z",
+    "2026-07-01T23:59:59.999Z"
+  ],
+  "series": [
+    {
+      "badgeId": "b-expert-mapper",
+      "badgeName": "Mapeador Experto",
+      "status": "active",
+      "points": [0.45, 0.38, 0.25, 0.18, 0.1429],
+      "isCandidate": true,
+      "isLowestCII": true,
+      "currentCII": 0.1429
+    }
+  ]
+}
+```
+
