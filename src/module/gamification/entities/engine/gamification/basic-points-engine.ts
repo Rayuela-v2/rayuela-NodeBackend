@@ -75,10 +75,10 @@ export class BasicPointsEngine implements PointsEngine {
   }
 
   calculatePoints(task: Task, project: Project & { user?: UserStatus }) {
-    return project.gamification.pointRules.reduce((acc, rule) => {
-      return (
-        acc + (rule.matchTask(task) && rule.mustContribute ? rule.score : 0)
-      );
-    }, 0);
+    // mustContribute only applies to check-ins, not to the points shown on a task.
+    return project.gamification.pointRules.reduce(
+      (acc, rule) => acc + (rule.matchTask(task) ? rule.score : 0),
+      0,
+    );
   }
 }

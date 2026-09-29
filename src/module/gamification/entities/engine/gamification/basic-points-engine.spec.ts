@@ -184,6 +184,27 @@ describe('BasicPointsEngine', () => {
       expect(result).toBe(10);
     });
 
+    it('should count matching rules even if mustContribute is false', () => {
+      const project = {
+        gamification: {
+          pointRules: [
+            {
+              matchTask: jest.fn().mockReturnValue(true),
+              score: 15,
+              mustContribute: false,
+            },
+            {
+              matchTask: jest.fn().mockReturnValue(true),
+              score: 5,
+              mustContribute: false,
+            },
+          ],
+        },
+      } as any;
+
+      expect(engine.calculatePoints({} as any, project)).toBe(20);
+    });
+
     it('should return 0 if no rule matches', () => {
       const task = {} as any;
       const project = {
