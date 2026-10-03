@@ -273,6 +273,90 @@ describe('CheckinService', () => {
       expect(mockMoveDao.create).not.toHaveBeenCalled();
     });
 
+    it('should overwrite datetime with current real-time timestamp when manualLocation is false', async () => {
+      const pastDate = new Date('2020-01-01T12:00:00Z');
+      const createCheckinDto: CreateCheckinDto = {
+        datetime: pastDate,
+        taskType: 'type',
+        userId: 'user1',
+        projectId: 'project1',
+        latitude: '0',
+        longitude: '0',
+      };
+
+      const user = new User(
+        'test@test.com',
+        'testuser',
+        'password',
+        'Test User',
+      );
+      user.id = 'user1';
+      user.addBadgeFromProject = jest.fn();
+      user.addContribution = jest.fn();
+
+      const project = ProjectBuilder.withManualLocation(false).build();
+      project.id = 'project1';
+      user.addProject(project.id);
+
+      mockTaskService.findByProjectId.mockResolvedValue([]);
+      mockUserService.getByUserId.mockResolvedValue(user);
+      mockUserService.findAllByProjectId.mockResolvedValue([user]);
+      mockProjectService.findOne.mockResolvedValue(project);
+      mockCheckInDao.create.mockImplementation((c) =>
+        Promise.resolve({ _id: 'checkin1', ...c }),
+      );
+
+      const before = Date.now();
+      await service.create({ createCheckinDto });
+      const after = Date.now();
+
+      expect(mockCheckInDao.create).toHaveBeenCalled();
+      const savedCheckin = mockCheckInDao.create.mock.calls[0][0];
+      expect(savedCheckin.date.getTime()).toBeGreaterThanOrEqual(before);
+      expect(savedCheckin.date.getTime()).toBeLessThanOrEqual(after);
+      expect(savedCheckin.date).not.toEqual(pastDate);
+    });
+
+    it('should preserve datetime when manualLocation is true', async () => {
+      const customDate = new Date('2025-05-10T10:00:00Z');
+      const createCheckinDto: CreateCheckinDto = {
+        datetime: customDate,
+        taskType: 'type',
+        userId: 'user1',
+        projectId: 'project1',
+        latitude: '0',
+        longitude: '0',
+      };
+
+      const user = new User(
+        'test@test.com',
+        'testuser',
+        'password',
+        'Test User',
+      );
+      user.id = 'user1';
+      user.addBadgeFromProject = jest.fn();
+      user.addContribution = jest.fn();
+
+      const project = ProjectBuilder.withManualLocation(true).build();
+      project.id = 'project1';
+      user.addProject(project.id);
+
+      mockTaskService.findByProjectId.mockResolvedValue([]);
+      mockUserService.getByUserId.mockResolvedValue(user);
+      mockUserService.findAllByProjectId.mockResolvedValue([user]);
+      mockProjectService.findOne.mockResolvedValue(project);
+      mockCheckInDao.create.mockImplementation((c) =>
+        Promise.resolve({ _id: 'checkin1', ...c }),
+      );
+
+      await service.create({ createCheckinDto });
+
+      expect(mockCheckInDao.create).toHaveBeenCalled();
+      const savedCheckin = mockCheckInDao.create.mock.calls[0][0];
+      expect(savedCheckin.date).toEqual(customDate);
+    });
+
     it('should add badges to user if game results in new badges', async () => {
       const createCheckinDto: CreateCheckinDto = {
         datetime: new Date(),
