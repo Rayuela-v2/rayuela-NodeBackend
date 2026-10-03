@@ -63,6 +63,10 @@ export class CheckinService {
       throw new ConflictException('The project is not running');
     }
 
+    if (!project.manualLocation) {
+      checkin.date = new Date();
+    }
+
     if (files && files.length > 0) {
       const uploadPromises = files.map((file) =>
         this.storageService.uploadFile(
