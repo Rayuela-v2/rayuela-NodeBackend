@@ -111,6 +111,20 @@ export class GamificationDao {
       .exec();
   }
 
+  async updateBadgeImageUrl(
+    projectId: string,
+    badgeId: string,
+    imageUrl: string,
+  ): Promise<GamificationTemplate | null> {
+    return this.gamificationModel
+      .findOneAndUpdate(
+        { projectId, 'badges._id': badgeId },
+        { $set: { 'badges.$.imageUrl': imageUrl } },
+        { new: true },
+      )
+      .exec();
+  }
+
   /**
    * Moves a badge rule through the fading lifecycle, keeping the window
    * fields consistent with the status so `effectiveBadgeStatus` never has

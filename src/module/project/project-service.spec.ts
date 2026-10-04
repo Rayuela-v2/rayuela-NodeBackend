@@ -14,6 +14,8 @@ import { LeaderboardService } from '../leaderboard/leaderboard.service';
 import { BadgeRule } from '../gamification/entities/gamification.entity';
 import { getModelToken } from '@nestjs/mongoose';
 import { CheckInTemplate } from '../checkin/persistence/checkin.schema';
+import { StorageService } from '../storage/storage.service';
+import { GamificationDao } from '../gamification/persistence/gamification-dao.service';
 
 const mockCheckInModel = {
   find: jest.fn().mockReturnThis(),
@@ -37,6 +39,18 @@ const mockLeaderboardService = {
   getLeaderboardFor: jest.fn(),
 };
 
+const mockStorageService = {
+  uploadFile: jest.fn(),
+  optimizeImage: jest.fn(),
+  getFile: jest.fn(),
+};
+
+const mockGamificationDao = {
+  getBadgesByProject: jest.fn(),
+  updateBadge: jest.fn(),
+  updateBadgeImageUrl: jest.fn(),
+};
+
 describe('ProjectService', () => {
   let service: ProjectService;
 
@@ -47,6 +61,8 @@ describe('ProjectService', () => {
         { provide: ProjectDao, useValue: mockProjectDao },
         { provide: UserService, useValue: mockUserService },
         { provide: LeaderboardService, useValue: mockLeaderboardService },
+        { provide: StorageService, useValue: mockStorageService },
+        { provide: GamificationDao, useValue: mockGamificationDao },
         {
           provide: getModelToken(CheckInTemplate.collectionName()),
           useValue: mockCheckInModel,
@@ -223,6 +239,71 @@ describe('ProjectService', () => {
       mockProjectDao.findOne.mockResolvedValue(project);
       await service.findOnePublic('p1');
       expect(mockProjectDao.findOne).toHaveBeenCalledWith('p1');
+    });
+  });
+
+  describe('migrateImages', () => {
+    it('should migrate external project cover and badge images', async () => {
+      const project = ProjectBuilder.build();
+      project.image = 'https://example.com/cover.png';
+      mockProjectDao.findOne.mockResolvedValue(project);
+
+      const badgesDoc = {
+        badges: [
+          {
+            _id: 'b1',
+            name: 'Pioneer',
+            imageUrl: 'https://example.com/badge1.png',
+          },
+          {
+            _id: 'b2',
+            name: 'Local',
+            imageUrl: 'badges/internal.jpg', // already migrated
+          },
+        ],
+      };
+      mockGamificationDao.getBadgesByProject.mockResolvedValue(badgesDoc);
+
+      jest.spyOn(service, 'fetchImageBuffer').mockResolvedValue({
+        buffer: Buffer.from('fake-image-bytes'),
+        mimetype: 'image/png',
+      });
+
+      mockStorageService.optimizeImage.mockImplementation(async (f) => f);
+      mockStorageService.uploadFile
+        .mockResolvedValueOnce('projects/p1/cover.jpg')
+        .mockResolvedValueOnce('badges/b1.jpg');
+
+      const result = await service.migrateImages('p1');
+
+      expect(result.projectImageMigrated).toBe(true);
+      expect(result.badgesMigratedCount).toBe(1);
+      expect(result.failures).toHaveLength(0);
+      expect(mockProjectDao.update).toHaveBeenCalledWith('p1', {
+        image: 'projects/p1/cover.jpg',
+      });
+      expect(mockGamificationDao.updateBadgeImageUrl).toHaveBeenCalledWith(
+        'p1',
+        'b1',
+        'badges/b1.jpg',
+      );
+    });
+
+    it('should record failures gracefully when fetch fails', async () => {
+      const project = ProjectBuilder.build();
+      project.image = 'https://broken.com/cover.png';
+      mockProjectDao.findOne.mockResolvedValue(project);
+      mockGamificationDao.getBadgesByProject.mockResolvedValue({ badges: [] });
+
+      jest
+        .spyOn(service, 'fetchImageBuffer')
+        .mockRejectedValue(new Error('Network error'));
+
+      const result = await service.migrateImages('p1');
+
+      expect(result.projectImageMigrated).toBe(false);
+      expect(result.failures).toHaveLength(1);
+      expect(result.failures[0]).toContain('Project cover: Network error');
     });
   });
 });

@@ -68,4 +68,11 @@ export class ProjectController {
   toggleAvailable(@Param('id') id: string) {
     return this.projectService.toggleAvailable(id);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.Admin)
+  @Post('/:id/migrate-images')
+  migrateImages(@Param('id') id: string) {
+    return this.projectService.migrateImages(id);
+  }
 }
