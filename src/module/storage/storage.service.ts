@@ -7,6 +7,13 @@ import {
 } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 
+import sharp from 'sharp';
+
+export interface OptimizeImageOptions {
+  maxDimension?: number;
+  quality?: number;
+}
+
 @Injectable()
 export class StorageService {
   private readonly s3Client: S3Client;
@@ -37,8 +44,99 @@ export class StorageService {
     }
   }
 
+  /**
+   * Optimizes an image buffer/file using sharp: auto-orient, resize within maxDimension,
+   * re-encode to JPEG quality.
+   *
+   * Zero-friction fail-open guarantee: falls back to original buffer on error.
+   */
+  async optimizeImage(
+    file: {
+      buffer: Buffer;
+      originalname?: string;
+      mimetype?: string;
+      size?: number;
+    },
+    options: OptimizeImageOptions = {},
+  ): Promise<{
+    buffer: Buffer;
+    originalname: string;
+    mimetype: string;
+    size: number;
+  }> {
+    const { maxDimension = 1600, quality = 80 } = options;
+
+    if (!file || !file.buffer) {
+      return {
+        buffer: file?.buffer,
+        originalname: file?.originalname || 'image.jpg',
+        mimetype: file?.mimetype || 'image/jpeg',
+        size: file?.size || 0,
+      };
+    }
+
+    try {
+      const metadata = await sharp(file.buffer).metadata();
+      const hasAlpha = !!metadata.hasAlpha;
+      const isPngOrWebp =
+        file.mimetype === 'image/png' ||
+        file.mimetype === 'image/webp' ||
+        metadata.format === 'png' ||
+        metadata.format === 'webp';
+
+      const pipeline = sharp(file.buffer).rotate().resize({
+        width: maxDimension,
+        height: maxDimension,
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+
+      let optimizedBuffer: Buffer;
+      let mimetype: string;
+      let extension: string;
+
+      if (hasAlpha || isPngOrWebp) {
+        // Retain full alpha transparency using WebP
+        optimizedBuffer = await pipeline
+          .webp({ quality, alphaQuality: 100, effort: 4 })
+          .toBuffer();
+        mimetype = 'image/webp';
+        extension = 'webp';
+      } else {
+        optimizedBuffer = await pipeline
+          .jpeg({ quality, mozjpeg: true })
+          .toBuffer();
+        mimetype = 'image/jpeg';
+        extension = 'jpg';
+      }
+
+      const originalBase = file.originalname
+        ? file.originalname.replace(/\.[^/.]+$/, '')
+        : 'image';
+
+      return {
+        buffer: optimizedBuffer,
+        size: optimizedBuffer.length,
+        mimetype,
+        originalname: `${originalBase}.${extension}`,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to optimize image ${file.originalname || 'unknown'}: ${error?.message || error}. Falling back to original buffer.`,
+      );
+      return {
+        buffer: file.buffer,
+        size: file.size || file.buffer.length,
+        mimetype: file.mimetype || 'image/jpeg',
+        originalname: file.originalname || 'image.jpg',
+      };
+    }
+  }
+
   async uploadFile(file: any, folder: string): Promise<string> {
-    const fileExtension = file.originalname.split('.').pop();
+    const fileExtension = file.originalname
+      ? file.originalname.split('.').pop()
+      : 'jpg';
     const fileName = `${folder}/${uuidv4()}.${fileExtension}`;
 
     const command = new PutObjectCommand({

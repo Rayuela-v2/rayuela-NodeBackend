@@ -10,6 +10,8 @@ describe('StorageController', () => {
 
   const mockStorageService = {
     getFile: jest.fn(),
+    optimizeImage: jest.fn(),
+    uploadFile: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -69,6 +71,48 @@ describe('StorageController', () => {
       await expect(controller.getFile(mockKey, mockRes)).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('uploadFile', () => {
+    it('should optimize image and upload to specified folder', async () => {
+      const mockFile = {
+        originalname: 'badge.png',
+        buffer: Buffer.from('image-data'),
+        mimetype: 'image/png',
+        size: 100,
+      } as Express.Multer.File;
+
+      const optimized = {
+        ...mockFile,
+        buffer: Buffer.from('optimized-data'),
+      };
+
+      mockStorageService.optimizeImage = jest.fn().mockResolvedValue(optimized);
+      mockStorageService.uploadFile = jest
+        .fn()
+        .mockResolvedValue('badges/unique-id.jpg');
+
+      const result = await controller.uploadFile(mockFile, 'badges');
+
+      expect(mockStorageService.optimizeImage).toHaveBeenCalledWith(mockFile, {
+        maxDimension: 512,
+        quality: 85,
+      });
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        optimized,
+        'badges',
+      );
+      expect(result).toEqual({
+        key: 'badges/unique-id.jpg',
+        url: '/storage/file?key=badges%2Funique-id.jpg',
+      });
+    });
+
+    it('should throw BadRequestException if no file is provided', async () => {
+      await expect(
+        controller.uploadFile(null as any, 'badges'),
+      ).rejects.toThrow();
     });
   });
 });

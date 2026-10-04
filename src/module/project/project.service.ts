@@ -29,12 +29,23 @@ import {
 } from '../checkin/persistence/checkin.schema';
 import { CheckinMapper } from '../checkin/persistence/CheckinMapper';
 import { BasicBadgeEngine } from '../gamification/entities/engine/gamification/basic-badge-engine';
+import { StorageService } from '../storage/storage.service';
+import { GamificationDao } from '../gamification/persistence/gamification-dao.service';
+import http from 'http';
+import https from 'https';
 
 export interface UserStatus {
   isSubscribed: boolean;
   badges: BadgeRule[];
   points: number;
   leaderboard: Leaderboard;
+}
+
+export interface ImageMigrationResult {
+  projectId: string;
+  projectImageMigrated: boolean;
+  badgesMigratedCount: number;
+  failures: string[];
 }
 
 @Injectable()
@@ -45,6 +56,8 @@ export class ProjectService {
     private readonly leaderboardService: LeaderboardService,
     @InjectModel(CheckInTemplate.collectionName())
     private readonly checkInModel: Model<CheckInDocument>,
+    private readonly storageService: StorageService,
+    private readonly gamificationDao: GamificationDao,
   ) {}
 
   async findAll(): Promise<(ProjectTemplate & { _id: string })[]> {
@@ -201,5 +214,174 @@ export class ProjectService {
 
   findOnePublic(id: string) {
     return this.projectDao.findOne(id);
+  }
+
+  /**
+   * Downloads an image from an external HTTP/HTTPS URL with timeout and size cap (10MB).
+   */
+  async fetchImageBuffer(
+    url: string,
+    timeoutMs = 8000,
+  ): Promise<{ buffer: Buffer; mimetype: string }> {
+    return new Promise((resolve, reject) => {
+      const client = url.startsWith('https') ? https : http;
+      const req = client.get(
+        url,
+        {
+          timeout: timeoutMs,
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Rayuela/1.0',
+          },
+        },
+        (res) => {
+          if (
+            res.statusCode &&
+            (res.statusCode === 301 || res.statusCode === 302) &&
+            res.headers.location
+          ) {
+            return this.fetchImageBuffer(res.headers.location, timeoutMs)
+              .then(resolve)
+              .catch(reject);
+          }
+
+          if (
+            !res.statusCode ||
+            res.statusCode < 200 ||
+            res.statusCode >= 300
+          ) {
+            return reject(
+              new Error(`Failed to fetch image: HTTP status ${res.statusCode}`),
+            );
+          }
+
+          const contentType = res.headers['content-type'] || 'image/jpeg';
+          const chunks: Buffer[] = [];
+          let totalLength = 0;
+          const maxBytes = 10 * 1024 * 1024; // 10MB limit
+
+          res.on('data', (chunk: Buffer) => {
+            totalLength += chunk.length;
+            if (totalLength > maxBytes) {
+              req.destroy(new Error('Image exceeds 10MB size limit'));
+              return;
+            }
+            chunks.push(chunk);
+          });
+
+          res.on('end', () => {
+            resolve({
+              buffer: Buffer.concat(chunks),
+              mimetype: contentType,
+            });
+          });
+        },
+      );
+
+      req.on('timeout', () => {
+        req.destroy(new Error(`Timeout fetching image after ${timeoutMs}ms`));
+      });
+
+      req.on('error', (err) => {
+        reject(err);
+      });
+    });
+  }
+
+  /**
+   * Migrates external project cover image and badge images into Garage S3.
+   */
+  async migrateImages(projectId: string): Promise<ImageMigrationResult> {
+    const project = await this.projectDao.findOne(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const failures: string[] = [];
+    let projectImageMigrated = false;
+    let badgesMigratedCount = 0;
+
+    // 1. Migrate Project Cover Image
+    if (
+      project.image &&
+      (project.image.startsWith('http://') ||
+        project.image.startsWith('https://'))
+    ) {
+      try {
+        const { buffer, mimetype } = await this.fetchImageBuffer(project.image);
+        const ext = mimetype.includes('png')
+          ? 'png'
+          : mimetype.includes('webp')
+            ? 'webp'
+            : 'jpg';
+        const optimized = await this.storageService.optimizeImage(
+          { buffer, mimetype, originalname: `project-cover.${ext}` },
+          { maxDimension: 1600, quality: 80 },
+        );
+        const key = await this.storageService.uploadFile(
+          optimized,
+          `projects/${projectId}`,
+        );
+        await this.projectDao.update(projectId, { image: key });
+        projectImageMigrated = true;
+      } catch (err: any) {
+        failures.push(`Project cover: ${err?.message || err}`);
+      }
+    }
+
+    // 2. Migrate Badge Images
+    const gamificationDoc =
+      await this.gamificationDao.getBadgesByProject(projectId);
+    if (
+      gamificationDoc &&
+      gamificationDoc.badges &&
+      gamificationDoc.badges.length > 0
+    ) {
+      for (const badge of gamificationDoc.badges) {
+        if (
+          badge.imageUrl &&
+          (badge.imageUrl.startsWith('http://') ||
+            badge.imageUrl.startsWith('https://'))
+        ) {
+          try {
+            const { buffer, mimetype } = await this.fetchImageBuffer(
+              badge.imageUrl,
+            );
+            const ext = mimetype.includes('png')
+              ? 'png'
+              : mimetype.includes('webp')
+                ? 'webp'
+                : 'jpg';
+            const optimized = await this.storageService.optimizeImage(
+              {
+                buffer,
+                mimetype,
+                originalname: `${badge.name || 'badge'}.${ext}`,
+              },
+              { maxDimension: 512, quality: 85 },
+            );
+            const key = await this.storageService.uploadFile(
+              optimized,
+              'badges',
+            );
+            await this.gamificationDao.updateBadgeImageUrl(
+              projectId,
+              String(badge._id),
+              key,
+            );
+            badgesMigratedCount++;
+          } catch (err: any) {
+            failures.push(`Badge "${badge.name}": ${err?.message || err}`);
+          }
+        }
+      }
+    }
+
+    return {
+      projectId,
+      projectImageMigrated,
+      badgesMigratedCount,
+      failures,
+    };
   }
 }
