@@ -18,6 +18,7 @@ import { User } from '../auth/users/user.entity';
 import { GamificationEngineFactory } from '../gamification/entities/engine/gamification/gamification-strategy-factory';
 import { StorageService } from '../storage/storage.service';
 import { CheckinIdempotencyDao } from './persistence/checkin-idempotency.dao';
+import sharp from 'sharp';
 
 @Injectable()
 export class CheckinService {
@@ -68,7 +69,10 @@ export class CheckinService {
     }
 
     if (files && files.length > 0) {
-      const uploadPromises = files.map((file) =>
+      const optimizedFiles = await Promise.all(
+        files.map((file) => this.optimizeImage(file)),
+      );
+      const uploadPromises = optimizedFiles.map((file) =>
         this.storageService.uploadFile(
           file,
           `checkins/${createCheckinDto.userId}`,
@@ -128,6 +132,48 @@ export class CheckinService {
     return {
       ...this.buildCreateResponse(move, contribution),
     };
+  }
+
+  /**
+   * Optimizes an uploaded image using sharp: auto-orient, resize to max 1600px
+   * on long edge, and re-encode to JPEG quality 80.
+   *
+   * Zero-friction fail-open guarantee: if sharp fails on damaged bytes or an
+   * unhandled format, silently fall back to the original file buffer.
+   */
+  async optimizeImage(file: Express.Multer.File): Promise<Express.Multer.File> {
+    if (!file || !file.buffer) {
+      return file;
+    }
+    try {
+      const optimizedBuffer = await sharp(file.buffer)
+        .rotate()
+        .resize({
+          width: 1600,
+          height: 1600,
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+
+      const originalBase = file.originalname
+        ? file.originalname.replace(/\.[^/.]+$/, '')
+        : 'image';
+
+      return {
+        ...file,
+        buffer: optimizedBuffer,
+        size: optimizedBuffer.length,
+        mimetype: 'image/jpeg',
+        originalname: `${originalBase}.jpg`,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to optimize image ${file.originalname || 'unknown'}: ${error?.message || error}. Falling back to original buffer.`,
+      );
+      return file;
+    }
   }
 
   /**

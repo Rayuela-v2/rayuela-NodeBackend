@@ -16,6 +16,7 @@ import CheckinBuilder from './checkin.builder';
 import { StorageService } from '../storage/storage.service';
 import { CheckinIdempotencyDao } from './persistence/checkin-idempotency.dao';
 import { ConflictException } from '@nestjs/common';
+import sharp from 'sharp';
 
 const mockCheckInDao = {
   create: jest.fn(),
@@ -705,6 +706,59 @@ describe('CheckinService', () => {
         streakDays: 0,
         lastCheckinDay: null,
       });
+    });
+  });
+
+  describe('optimizeImage', () => {
+    it('normalizes valid image buffers to JPEG max 1600px', async () => {
+      const largePngBuffer = await sharp({
+        create: {
+          width: 2000,
+          height: 1000,
+          channels: 3,
+          background: { r: 255, g: 0, b: 0 },
+        },
+      })
+        .png()
+        .toBuffer();
+
+      const input = {
+        originalname: 'sample.png',
+        buffer: largePngBuffer,
+        mimetype: 'image/png',
+        size: largePngBuffer.length,
+      } as Express.Multer.File;
+
+      const result = await service.optimizeImage(input);
+
+      expect(result.mimetype).toBe('image/jpeg');
+      expect(result.originalname).toBe('sample.jpg');
+      expect(result.buffer).toBeDefined();
+
+      const metadata = await sharp(result.buffer).metadata();
+      expect(metadata.width).toBe(1600);
+      expect(metadata.height).toBe(800);
+      expect(metadata.format).toBe('jpeg');
+    });
+
+    it('falls back silently to original file buffer when compression fails', async () => {
+      const corruptFile = {
+        originalname: 'corrupt.jpg',
+        buffer: Buffer.from('invalid-non-image-data'),
+        mimetype: 'image/jpeg',
+        size: 22,
+      } as Express.Multer.File;
+
+      const result = await service.optimizeImage(corruptFile);
+
+      expect(result).toBe(corruptFile);
+      expect(result.buffer).toBe(corruptFile.buffer);
+    });
+
+    it('returns original input when file or buffer is missing', async () => {
+      const emptyFile = {} as Express.Multer.File;
+      const result = await service.optimizeImage(emptyFile);
+      expect(result).toBe(emptyFile);
     });
   });
 });

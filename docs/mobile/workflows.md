@@ -21,8 +21,10 @@ graph TD
 ### 1. Location Pick
 Uses `flutter_map` with OpenStreetMap (OSM) tiles. The user can tap the map to place a pin or use their current GPS location.
 
-### 2. Image Capture
+### 2. Image Capture & Compression
 Uses the `image_picker` plugin. Volunteers can take new photos or select them from the gallery (up to 3 images per check-in).
+
+Upon selection/capture, images are immediately resized and compressed on-device (max 1600px, JPEG quality 80) via `CheckinWizardController` and `ImageCompressor`. If compression fails, it fails open and uses the original raw image. See [Image Compression Pipeline](mobile/image-compression.md) for full details.
 
 ### 3. Task Type Selection
 The user selects a task type from the list provided by the project (e.g., "Observation", "Photo Report").
