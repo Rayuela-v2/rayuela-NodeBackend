@@ -6,15 +6,16 @@ This document details the client-side and server-side image processing, resoluti
 
 ## 1. Context & Motivation
 
-Volunteers in citizen science projects take observations in outdoor field environments (parks, riversides, trails) where mobile cellular bandwidth is limited, intermittent, or metered. 
+The primary objective of this implementation is **efficient storage management**, as object storage capacity is finite and costly.
 
-Modern mobile devices capture photographs at high resolutions (e.g., $12\text{ MP}$ to $48\text{ MP}+$), resulting in file sizes ranging from **$3\text{ MB}$ to $15\text{ MB}+$ per picture**. For a check-in with up to 3 photos:
-- Submitting an uncompressed check-in would require uploading **$10\text{ MB}$ to $40\text{ MB}$** over cellular data.
-- Uploads on slow connections frequently timed out (90s limit).
-- Local offline Outbox storage quickly consumed hundreds of megabytes on user devices.
-- Object storage (Garage S3) was burdened with storing raw camera resolutions unnecessary for scientific identification.
+Modern smartphones capture photographs at very high resolutions ($12\text{ MP}$ to $48\text{ MP}+$, generating files between $3\text{ MB}$ and $15\text{ MB}+$ each). For the goals of citizen science monitoring in Rayuela (verifying observations, specimens, and community tasks), such extreme resolution and file weight are unnecessary. 
 
-To eliminate this friction, Rayuela implements a **two-tier optimization pipeline**:
+By defining a **maximum standard resolution (bounding box of 1600px)** and compressing to JPEG (quality 80):
+- **Storage sustainability (Primary Goal):** S3 bucket usage drops by over 90%, preventing rapid exhaustion of limited storage quotas.
+- **Uniformity:** Images across all devices (diverse Android & iOS sensors, web uploads) are standardized to a consistent maximum format and dimensions.
+- **Connectivity & Device Health:** Reduces upload bandwidth for volunteers in the field and minimizes disk space consumption in the mobile offline outbox.
+
+To achieve this reliably without user friction, Rayuela implements a **two-tier optimization pipeline**:
 1. **Tier 1 (Client-side, Flutter):** Immediate resize and compression upon camera capture or gallery selection before writing to local state or persistent disk.
 2. **Tier 2 (Server-side, NestJS):** Uniform normalization and compression via `sharp` before writing to S3 object storage.
 
