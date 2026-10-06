@@ -217,11 +217,11 @@ export class ProjectService {
   }
 
   /**
-   * Downloads an image from an external HTTP/HTTPS URL with timeout and size cap (10MB).
+   * Downloads an image from an external HTTP/HTTPS URL with timeout and size cap (30MB).
    */
   async fetchImageBuffer(
     url: string,
-    timeoutMs = 8000,
+    timeoutMs = 20000,
   ): Promise<{ buffer: Buffer; mimetype: string }> {
     return new Promise((resolve, reject) => {
       const client = url.startsWith('https') ? https : http;
@@ -258,12 +258,12 @@ export class ProjectService {
           const contentType = res.headers['content-type'] || 'image/jpeg';
           const chunks: Buffer[] = [];
           let totalLength = 0;
-          const maxBytes = 10 * 1024 * 1024; // 10MB limit
+          const maxBytes = 30 * 1024 * 1024; // 30MB limit
 
           res.on('data', (chunk: Buffer) => {
             totalLength += chunk.length;
             if (totalLength > maxBytes) {
-              req.destroy(new Error('Image exceeds 10MB size limit'));
+              req.destroy(new Error('Image exceeds 30MB size limit'));
               return;
             }
             chunks.push(chunk);
