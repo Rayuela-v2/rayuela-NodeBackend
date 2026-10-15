@@ -317,11 +317,15 @@ describe('BasicBadgeEngine', () => {
         'Morning',
         [1, 2, 3, 4, 5, 6, 7],
         { start: '08:00', end: '12:00' },
-        new Date(2020, 0, 1),
-        new Date(2030, 0, 1),
+        new Date('2020-01-01T00:00:00.000Z'),
+        new Date('2030-01-01T00:00:00.000Z'),
+        'America/Argentina/Buenos_Aires',
       );
-      const project = { timeIntervals: [morning] } as any;
-      const checkin = { date: new Date(2023, 0, 1, 9, 0) } as any;
+      const project = {
+        timeIntervals: [morning],
+        timezone: 'America/Argentina/Buenos_Aires',
+      } as any;
+      const checkin = { date: new Date('2023-01-01T09:00:00-03:00') } as any;
       expect((engine as any).matchTimeInterval(rule2, checkin, project)).toBe(
         true,
       );

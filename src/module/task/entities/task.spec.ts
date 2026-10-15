@@ -20,9 +20,10 @@ describe('Task', () => {
         start: '13:00:00',
         end: '19:00:00',
       },
-      new Date('01/01/2024'),
-      new Date('12/31/2024'),
-    ); // Lunes, Miércoles y Viernes de 13 a 19
+      new Date('2024-01-01T00:00:00.000Z'),
+      new Date('2024-12-31T23:59:59.999Z'),
+      'America/Argentina/Buenos_Aires',
+    ); // Lunes, Miércoles y Viernes de 13 a 19 en Buenos Aires
     area = {
       type: 'Feature',
       properties: {
@@ -60,7 +61,7 @@ describe('Task', () => {
     checkin = new Checkin(
       '40.7659',
       '-73.9875',
-      new Date('2024-09-16T15:00:00'),
+      new Date('2024-09-16T15:00:00-03:00'),
       'project123',
       null,
       'type',
@@ -92,7 +93,7 @@ describe('Task', () => {
 
     it('should return false if the checkin is outside the time restriction', () => {
       // Cambiamos la fecha del checkin a una que esté fuera de las restricciones de tiempo
-      checkin.date = new Date('2024-09-16T20:00:00'); // Lunes a las 20:00, fuera del rango de 13-19
+      checkin.date = new Date('2024-09-16T20:00:00-03:00'); // Lunes a las 20:00, fuera del rango de 13-19
 
       const result = task.accept(checkin);
 
@@ -129,7 +130,7 @@ describe('Task', () => {
     });
 
     it('should return false if the date does not satisfy the time restriction', () => {
-      checkin.date = new Date('2024-09-16T20:00:00'); // Lunes a las 20:00, fuera del rango
+      checkin.date = new Date('2024-09-16T20:00:00-03:00'); // Lunes a las 20:00, fuera del rango
       const result = (task as any).isValidTimeRestriction(checkin.date);
       expect(result).toBe(false);
     });
