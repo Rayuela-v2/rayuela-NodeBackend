@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { CreateCheckinDto } from './dto/create-checkin.dto';
 import { UpdateCheckinDto } from './dto/update-checkin.dto';
 import { AdminCheckinQueryDto } from './dto/admin-checkin-query.dto';
@@ -18,6 +23,7 @@ import { User } from '../auth/users/user.entity';
 import { GamificationEngineFactory } from '../gamification/entities/engine/gamification/gamification-strategy-factory';
 import { StorageService } from '../storage/storage.service';
 import { CheckinIdempotencyDao } from './persistence/checkin-idempotency.dao';
+import { MAX_FUTURE_CHECKIN_TOLERANCE_MS } from './checkin.constants';
 import sharp from 'sharp';
 
 @Injectable()
@@ -64,8 +70,15 @@ export class CheckinService {
       throw new ConflictException('The project is not running');
     }
 
-    if (!project.manualLocation) {
+    if (!checkin.date || isNaN(new Date(checkin.date).getTime())) {
       checkin.date = new Date();
+    } else {
+      const checkinTime = new Date(checkin.date).getTime();
+      if (checkinTime - Date.now() > MAX_FUTURE_CHECKIN_TOLERANCE_MS) {
+        throw new BadRequestException(
+          'Check-in timestamp cannot be in the future',
+        );
+      }
     }
 
     if (files && files.length > 0) {

@@ -98,6 +98,7 @@ export class TaskDao {
       ti?.time,
       ti?.startDate,
       ti?.endDate,
+      ti?.timezone || project.timezone,
     );
   }
 

@@ -7,6 +7,7 @@ import {
   RecommendationStrategy,
 } from '../dto/create-project.dto';
 import { TaskTypeValue } from './task-type';
+import { DEFAULT_PROJECT_TIMEZONE } from '../project.constants';
 
 export class Project {
   constructor(
@@ -25,6 +26,7 @@ export class Project {
     leaderboardStrategy: LeaderboardStrategy,
     recommendationStrategy: RecommendationStrategy,
     manualLocation: boolean = false,
+    timezone: string = DEFAULT_PROJECT_TIMEZONE,
   ) {
     this.id = id;
     this.name = name;
@@ -41,6 +43,7 @@ export class Project {
     this.recommendationStrategy = recommendationStrategy;
     this.manualLocation = manualLocation;
     this.leaderboardStrategy = leaderboardStrategy;
+    this.timezone = timezone;
   }
 
   id: string;
@@ -58,4 +61,5 @@ export class Project {
   recommendationStrategy: RecommendationStrategy;
   manualLocation: boolean;
   leaderboardStrategy: LeaderboardStrategy;
+  timezone: string;
 }

@@ -8,6 +8,7 @@ import {
   RecommendationStrategy,
 } from './dto/create-project.dto';
 import { TaskTypeValue } from './entities/task-type';
+import { DEFAULT_PROJECT_TIMEZONE } from './project.constants';
 
 class ProjectBuilder {
   private id: string;
@@ -25,6 +26,7 @@ class ProjectBuilder {
   private leaderboardStrategy: LeaderboardStrategy;
   private recommendationStrategy: RecommendationStrategy;
   private manualLocation: boolean;
+  private timezone: string;
 
   constructor() {
     this.id = 'default-id';
@@ -42,6 +44,7 @@ class ProjectBuilder {
     this.leaderboardStrategy = LeaderboardStrategy.POINTS_FIRST;
     this.recommendationStrategy = RecommendationStrategy.SIMPLE;
     this.manualLocation = false;
+    this.timezone = DEFAULT_PROJECT_TIMEZONE;
   }
 
   withId(id: string): this {
@@ -121,6 +124,11 @@ class ProjectBuilder {
     return this;
   }
 
+  withTimezone(timezone: string): this {
+    this.timezone = timezone;
+    return this;
+  }
+
   build(): Project {
     return new Project(
       this.id,
@@ -138,6 +146,7 @@ class ProjectBuilder {
       this.leaderboardStrategy,
       this.recommendationStrategy,
       this.manualLocation,
+      this.timezone,
     );
   }
 }

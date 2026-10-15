@@ -582,6 +582,7 @@ export class AnalyticsDao {
           ti.time,
           new Date(ti.startDate),
           new Date(ti.endDate),
+          ti.timezone || project.timezone,
         ),
     );
 
