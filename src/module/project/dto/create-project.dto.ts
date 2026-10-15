@@ -43,6 +43,7 @@ export class CreateProjectDto {
    * admin UI sends it on every save, so a typo here type-checked fine.
    */
   leaderboardStrategy?: LeaderboardStrategy;
+  timezone?: string;
 }
 
 export interface FeatureCollection {

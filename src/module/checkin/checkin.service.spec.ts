@@ -15,7 +15,7 @@ import TaskBuilder from '../task/task.builder';
 import CheckinBuilder from './checkin.builder';
 import { StorageService } from '../storage/storage.service';
 import { CheckinIdempotencyDao } from './persistence/checkin-idempotency.dao';
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import sharp from 'sharp';
 
 const mockCheckInDao = {
@@ -274,7 +274,7 @@ describe('CheckinService', () => {
       expect(mockMoveDao.create).not.toHaveBeenCalled();
     });
 
-    it('should overwrite datetime with current real-time timestamp when manualLocation is false', async () => {
+    it('should preserve datetime when manualLocation is false (offline-first architecture)', async () => {
       const pastDate = new Date('2020-01-01T12:00:00Z');
       const createCheckinDto: CreateCheckinDto = {
         datetime: pastDate,
@@ -307,15 +307,46 @@ describe('CheckinService', () => {
         Promise.resolve({ _id: 'checkin1', ...c }),
       );
 
-      const before = Date.now();
       await service.create({ createCheckinDto });
-      const after = Date.now();
 
       expect(mockCheckInDao.create).toHaveBeenCalled();
       const savedCheckin = mockCheckInDao.create.mock.calls[0][0];
-      expect(savedCheckin.date.getTime()).toBeGreaterThanOrEqual(before);
-      expect(savedCheckin.date.getTime()).toBeLessThanOrEqual(after);
-      expect(savedCheckin.date).not.toEqual(pastDate);
+      expect(savedCheckin.date).toEqual(pastDate);
+    });
+
+    it('should reject check-in if timestamp is in the future (> 10 minutes)', async () => {
+      const futureDate = new Date(Date.now() + 20 * 60 * 1000); // 20 minutes in the future
+      const createCheckinDto: CreateCheckinDto = {
+        datetime: futureDate,
+        taskType: 'type',
+        userId: 'user1',
+        projectId: 'project1',
+        latitude: '0',
+        longitude: '0',
+      };
+
+      const user = new User(
+        'test@test.com',
+        'testuser',
+        'password',
+        'Test User',
+      );
+      user.id = 'user1';
+
+      const project = ProjectBuilder.withManualLocation(false).build();
+      project.id = 'project1';
+
+      mockTaskService.findByProjectId.mockResolvedValue([]);
+      mockUserService.getByUserId.mockResolvedValue(user);
+      mockUserService.findAllByProjectId.mockResolvedValue([user]);
+      mockProjectService.findOne.mockResolvedValue(project);
+
+      await expect(service.create({ createCheckinDto })).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.create({ createCheckinDto })).rejects.toThrow(
+        'Check-in timestamp cannot be in the future',
+      );
     });
 
     it('should preserve datetime when manualLocation is true', async () => {

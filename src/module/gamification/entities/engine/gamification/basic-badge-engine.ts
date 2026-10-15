@@ -152,6 +152,7 @@ export class BasicBadgeEngine implements BadgeEngine {
       interval.time,
       interval.startDate,
       interval.endDate,
+      interval.timezone || project.timezone,
     );
   }
 

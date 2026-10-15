@@ -7,6 +7,7 @@ import {
   RecommendationStrategy,
 } from '../dto/create-project.dto';
 import { TaskTypeValue } from '../entities/task-type';
+import { DEFAULT_PROJECT_TIMEZONE } from '../project.constants';
 
 export type ProjectDocument = ProjectTemplate & Document;
 
@@ -29,6 +30,9 @@ export class ProjectTemplate {
 
   @Prop({ required: true, default: false })
   manualLocation: boolean;
+
+  @Prop({ type: String, default: DEFAULT_PROJECT_TIMEZONE })
+  timezone: string;
 
   @Prop({ type: MongooseSchema.Types.Mixed, default: {} }) // Permite cualquier tipo
   areas: any;

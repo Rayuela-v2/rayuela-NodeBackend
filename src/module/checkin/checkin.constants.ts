@@ -20,3 +20,6 @@ export const ALLOWED_IMAGE_MIMES: ReadonlySet<string> = new Set<string>([
 
 /** Header the mobile outbox sends so retries don't duplicate resources. */
 export const IDEMPOTENCY_HEADER = 'idempotency-key';
+
+/** Max tolerance for check-in timestamps in the future (clock skew guard). */
+export const MAX_FUTURE_CHECKIN_TOLERANCE_MS = 10 * 60 * 1000; // 10 minutes
