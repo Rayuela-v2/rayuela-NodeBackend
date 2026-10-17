@@ -263,5 +263,61 @@ describe('CheckInDao', () => {
       expect(res.total).toBe(1);
       expect(res.items).toEqual([inside]);
     });
+
+    it('returns empty results when taskIdIn and contributed=false are combined (strict AND)', async () => {
+      const res = await dao.findForAdmin({
+        projectId: 'p1',
+        taskIdIn: ['t1'],
+        contributed: false,
+        page: 1,
+        limit: 20,
+        sortOrder: -1,
+      });
+
+      expect(res).toEqual({ items: [], total: 0, page: 1, limit: 20 });
+    });
+
+    it('combines multiple filters (taskType, checkinIdIn, hasPhotos=false, contributed=false, dates) with AND semantics', async () => {
+      wireFindAndCount([], 0);
+      const from = new Date('2026-06-01T00:00:00.000Z');
+      const to = new Date('2026-06-01T23:59:59.999Z');
+
+      await dao.findForAdmin({
+        projectId: 'p1',
+        taskType: 'Observation',
+        checkinIdIn: ['c1', 'c2'],
+        hasPhotos: false,
+        contributed: false,
+        dateFrom: from,
+        dateTo: to,
+        page: 1,
+        limit: 20,
+        sortOrder: -1,
+      });
+
+      const arg = model.find.mock.calls[model.find.mock.calls.length - 1][0];
+      expect(arg).toEqual({
+        projectId: 'p1',
+        taskType: 'Observation',
+        _id: { $in: ['c1', 'c2'] },
+        $or: [
+          { contributesTo: { $exists: false } },
+          { contributesTo: null },
+          { contributesTo: '' },
+        ],
+        $and: [
+          {
+            $or: [
+              { imageRefs: { $exists: false } },
+              { imageRefs: { $size: 0 } },
+            ],
+          },
+        ],
+        datetime: {
+          $gte: from,
+          $lte: to,
+        },
+      });
+    });
   });
 });

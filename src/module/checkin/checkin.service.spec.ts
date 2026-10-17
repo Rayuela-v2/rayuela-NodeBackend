@@ -661,6 +661,35 @@ describe('CheckinService', () => {
       expect(result.items[0].taskName).toBe('Limpieza');
       expect(result.items[1].taskName).toBeNull();
     });
+
+    it('short-circuits with empty results when taskName and contributed=false are combined (strict AND)', async () => {
+      const result = await service.findForAdmin('p1', {
+        taskName: 'Limpieza',
+        contributed: 'false',
+      });
+
+      expect(mockTaskService.findByProjectId).not.toHaveBeenCalled();
+      expect(mockCheckInDao.findForAdmin).not.toHaveBeenCalled();
+      expect(result).toEqual({ items: [], total: 0, page: 1, limit: 20 });
+    });
+
+    it('expands date-only dateTo to end of UTC day (23:59:59.999Z)', async () => {
+      mockCheckInDao.findForAdmin.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+      });
+
+      await service.findForAdmin('p1', {
+        dateFrom: '2026-06-01',
+        dateTo: '2026-06-01',
+      });
+
+      const filterArg = mockCheckInDao.findForAdmin.mock.calls[0][0];
+      expect(filterArg.dateFrom).toEqual(new Date('2026-06-01T00:00:00.000Z'));
+      expect(filterArg.dateTo).toEqual(new Date('2026-06-01T23:59:59.999Z'));
+    });
   });
 
   describe('idempotency-records', () => {
