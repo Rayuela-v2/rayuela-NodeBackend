@@ -462,6 +462,9 @@ export class AnalyticsDao {
     }
 
     if (query.taskName && query.taskName.trim().length > 0) {
+      if (query.contributed === 'false') {
+        return { filter, hasNoResults: true };
+      }
       const taskIdIn = await this.findTaskIdsByName(projectId, query.taskName);
       if (taskIdIn.length === 0) {
         return { filter, hasNoResults: true };

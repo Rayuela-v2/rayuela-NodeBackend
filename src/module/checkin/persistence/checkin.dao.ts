@@ -191,9 +191,12 @@ export class CheckInDao {
     if (filter.checkinIdIn && filter.checkinIdIn.length > 0) {
       mongoFilter._id = { $in: filter.checkinIdIn };
     }
-    // taskIdIn ⇒ implies contributed=true. We let it win over the
-    // `contributed` flag to avoid producing contradictory queries.
     if (filter.taskIdIn && filter.taskIdIn.length > 0) {
+      if (filter.contributed === false) {
+        // Contradictory AND condition: matching a specific task requires
+        // contributesTo to be non-empty, which cannot also satisfy contributed=false.
+        return { items: [], total: 0, page: filter.page, limit: filter.limit };
+      }
       mongoFilter.contributesTo = { $in: filter.taskIdIn };
     } else if (filter.contributed === true) {
       mongoFilter.contributesTo = { $nin: [null, ''] };

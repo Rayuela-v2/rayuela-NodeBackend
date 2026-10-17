@@ -7,6 +7,7 @@ import { CreateTaskDto } from '../dto/create-task.dto';
 import { ProjectDao } from '../../project/persistence/project.dao';
 import { TimeInterval } from '../entities/time-restriction.entity';
 import { Project } from '../../project/entities/project';
+import { getTaskTypeName } from '../../project/entities/task-type';
 
 @Injectable()
 export class TaskDao {
@@ -138,7 +139,7 @@ export class TaskDao {
   }
 
   async deleteUseless(project: Project): Promise<number> {
-    const validTaskTypes = project.taskTypes;
+    const validTaskTypes = (project.taskTypes || []).map(getTaskTypeName);
     const validTimeIntervals = project.timeIntervals.map((ti) => ti.name);
     const validAreaIds = project.areas.features.map((f) =>
       f.properties.id?.toString(),

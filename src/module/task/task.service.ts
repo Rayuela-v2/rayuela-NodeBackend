@@ -12,6 +12,8 @@ import { BasicPointsEngine } from '../gamification/entities/engine/gamification/
 import { UserService } from '../auth/users/user.service';
 import { RecommendationEngineFactory } from '../gamification/entities/engine/recommendation/recommendation-engine-factory';
 
+import { getTaskTypeName } from '../project/entities/task-type';
+
 @Injectable()
 export class TaskService {
   constructor(
@@ -23,7 +25,8 @@ export class TaskService {
 
   async create(createTaskDto: CreateTaskDto) {
     const project = await this.projectService.findOne(createTaskDto.projectId);
-    if (!project.taskTypes.includes(createTaskDto.type)) {
+    const validTaskTypes = (project.taskTypes || []).map(getTaskTypeName);
+    if (!validTaskTypes.includes(createTaskDto.type)) {
       throw new BadRequestException('Task type is invalid');
     }
     const area = project.areas.features.find(

@@ -324,6 +324,9 @@ export class CheckinService {
     let taskIdIn: string[] | undefined;
     let projectTasks: Task[] | null = null;
     if (query.taskName && query.taskName.trim().length > 0) {
+      if (parseBool(query.contributed) === false) {
+        return { items: [], total: 0, page, limit };
+      }
       projectTasks = await this.taskService.findByProjectId(projectId);
       const needle = query.taskName.trim().toLowerCase();
       taskIdIn = projectTasks
@@ -348,7 +351,7 @@ export class CheckinService {
       hasPhotos: parseBool(query.hasPhotos),
       contributed: parseBool(query.contributed),
       dateFrom: parseDate(query.dateFrom),
-      dateTo: parseDate(query.dateTo),
+      dateTo: parseEndDate(query.dateTo),
       centerLat: parseFloatSafe(query.latitude),
       centerLng: parseFloatSafe(query.longitude),
       radiusKm: parseFloatSafe(query.radiusKm),
@@ -459,6 +462,20 @@ function parseDate(value: string | undefined): Date | undefined {
   if (!value) return undefined;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function parseEndDate(value: string | undefined): Date | undefined {
+  const d = parseDate(value);
+  if (!d) return undefined;
+  if (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  ) {
+    d.setUTCHours(23, 59, 59, 999);
+  }
+  return d;
 }
 
 function clamp(value: number, min: number, max: number): number {
