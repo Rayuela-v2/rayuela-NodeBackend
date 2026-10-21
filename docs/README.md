@@ -6,6 +6,7 @@ This repository contains the NestJS-based REST API and management backend for th
 
 ## Quick Links
 - [Deployment](deployment)
+- [Analytics Data Extraction](analytics-queries)
 - [Gamification Architecture](gamification-badges)
 - [Adaptive Gamification: Badge Fading](adaptive-gamification/badge-fading)
 - [Adaptive Gamification: Indicators Engine](adaptive-gamification/indicators-engine)
