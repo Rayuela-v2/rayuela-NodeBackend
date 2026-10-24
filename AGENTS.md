@@ -13,6 +13,7 @@ Rayuela is a full-stack citizen science platform with adaptive gamification for 
 
 ## Mandatory Development Rules
 - **ORG REPOSITORIES:** ALWAYS work exclusively in the repositories under the `Rayuela-v2` organization. NEVER perform actions in `cientopolis` source repositories.
+- **ACTOR TERMINOLOGY (`Persona colaboradora` / `Contributor`):** When referring to the citizen science participant role in documentation, diagrams, or UI copy, ALWAYS use **"Persona colaboradora"** in Spanish and **"Contributor"** in English.
 - **ISSUE TRACKING:** All issues are tracked in: [Rayuela-v2/rayuela-NodeBackend](https://github.com/Rayuela-v2/rayuela-NodeBackend)
 - **NO AI SIGNATURES:** Do not include agent signatures or attribution lines in PR descriptions or commits.
 
