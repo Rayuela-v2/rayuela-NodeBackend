@@ -167,8 +167,14 @@ export class AnalyticsDao {
     ]);
   }
 
-  async byStrategy(): Promise<StrategyBreakdown[]> {
+  async byStrategy(
+    projectId?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<StrategyBreakdown[]> {
     return this.checkinModel.aggregate([
+      ...this.projectMatch(projectId),
+      ...this.dateRangeMatch('datetime', startDate, endDate),
       this.lookupByStringId('projects', 'projectId', 'project'),
       { $unwind: '$project' },
       {
@@ -211,6 +217,7 @@ export class AnalyticsDao {
           activeUsers: { $size: '$users' },
         },
       },
+      { $sort: { projectName: 1 } },
     ]);
   }
 
@@ -221,17 +228,13 @@ export class AnalyticsDao {
     endDate?: string,
   ): Promise<PointsSeries[]> {
     return this.moveModel.aggregate([
-      ...this.dateRangeMatch('timestamp', startDate, endDate),
-      ...(projectId
-        ? [
-            this.lookupByStringId('checkins', 'checkinId', 'checkin'),
-            { $unwind: '$checkin' },
-            { $match: { 'checkin.projectId': projectId } },
-          ]
-        : []),
+      this.lookupByStringId('checkins', 'checkinId', 'checkin'),
+      { $unwind: '$checkin' },
+      ...(projectId ? [{ $match: { 'checkin.projectId': projectId } }] : []),
+      ...this.dateRangeMatch('checkin.datetime', startDate, endDate),
       {
         $group: {
-          _id: this.buildDateBucket(granularity, 'timestamp'),
+          _id: this.buildDateBucket(granularity, 'checkin.datetime'),
           totalPoints: { $sum: '$newPoints' },
           checkinCount: { $sum: 1 },
         },
@@ -254,9 +257,14 @@ export class AnalyticsDao {
     ]);
   }
 
-  async contributionRate(projectId?: string): Promise<ContributionRate[]> {
+  async contributionRate(
+    projectId?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<ContributionRate[]> {
     return this.checkinModel.aggregate([
       ...this.projectMatch(projectId),
+      ...this.dateRangeMatch('datetime', startDate, endDate),
       {
         $group: {
           _id: '$projectId',
@@ -295,6 +303,7 @@ export class AnalyticsDao {
           },
         },
       },
+      { $sort: { projectName: 1 } },
     ]);
   }
 
@@ -305,18 +314,14 @@ export class AnalyticsDao {
     endDate?: string,
   ): Promise<TimeSeries[]> {
     return this.moveModel.aggregate([
-      ...this.dateRangeMatch('timestamp', startDate, endDate),
-      ...(projectId
-        ? [
-            this.lookupByStringId('checkins', 'checkinId', 'checkin'),
-            { $unwind: '$checkin' },
-            { $match: { 'checkin.projectId': projectId } },
-          ]
-        : []),
+      this.lookupByStringId('checkins', 'checkinId', 'checkin'),
+      { $unwind: '$checkin' },
+      ...(projectId ? [{ $match: { 'checkin.projectId': projectId } }] : []),
+      ...this.dateRangeMatch('checkin.datetime', startDate, endDate),
       { $unwind: '$newBadges' },
       {
         $group: {
-          _id: this.buildDateBucket(granularity, 'timestamp'),
+          _id: this.buildDateBucket(granularity, 'checkin.datetime'),
           count: { $sum: 1 },
         },
       },
@@ -333,36 +338,33 @@ export class AnalyticsDao {
     const dateFilter = this.buildDateFilter('datetime', startDate, endDate);
     const baseMatch = { ...(projectId ? { projectId } : {}), ...dateFilter };
 
-    const [checkins, activeUsers, badgesResult, pointsResult] =
-      await Promise.all([
-        this.checkinModel.countDocuments(baseMatch),
-        this.checkinModel.distinct('userId', baseMatch),
-        this.moveModel.aggregate([
-          ...this.dateRangeMatch('timestamp', startDate, endDate),
-          ...(projectId
-            ? [
-                this.lookupByStringId('checkins', 'checkinId', 'checkin'),
-                { $unwind: '$checkin' },
-                { $match: { 'checkin.projectId': projectId } },
-              ]
-            : []),
-          { $unwind: '$newBadges' },
-          { $count: 'total' },
-        ]),
-        this.moveModel.aggregate([
-          ...this.dateRangeMatch('timestamp', startDate, endDate),
-          ...(projectId
-            ? [
-                this.lookupByStringId('checkins', 'checkinId', 'checkin'),
-                { $unwind: '$checkin' },
-                { $match: { 'checkin.projectId': projectId } },
-              ]
-            : []),
-          { $group: { _id: null, total: { $sum: '$newPoints' } } },
-        ]),
-      ]);
+    const [
+      checkins,
+      activeUsers,
+      badgesResult,
+      pointsResult,
+      contributionData,
+    ] = await Promise.all([
+      this.checkinModel.countDocuments(baseMatch),
+      this.checkinModel.distinct('userId', baseMatch),
+      this.moveModel.aggregate([
+        this.lookupByStringId('checkins', 'checkinId', 'checkin'),
+        { $unwind: '$checkin' },
+        ...(projectId ? [{ $match: { 'checkin.projectId': projectId } }] : []),
+        ...this.dateRangeMatch('checkin.datetime', startDate, endDate),
+        { $unwind: '$newBadges' },
+        { $count: 'total' },
+      ]),
+      this.moveModel.aggregate([
+        this.lookupByStringId('checkins', 'checkinId', 'checkin'),
+        { $unwind: '$checkin' },
+        ...(projectId ? [{ $match: { 'checkin.projectId': projectId } }] : []),
+        ...this.dateRangeMatch('checkin.datetime', startDate, endDate),
+        { $group: { _id: null, total: { $sum: '$newPoints' } } },
+      ]),
+      this.contributionRate(projectId, startDate, endDate),
+    ]);
 
-    const contributionData = await this.contributionRate(projectId);
     const totalContrib = contributionData.reduce(
       (s, p) => s + p.withContribution,
       0,

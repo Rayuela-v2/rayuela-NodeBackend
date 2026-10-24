@@ -36,6 +36,10 @@ export class Move {
     this._checkin = checkin;
     this._gameStatus = gameStatus;
     this._score = ScoreRate.NO_RATE;
-    this._timestamp = new Date();
+    const checkinDate = checkin?.date ? new Date(checkin.date) : null;
+    this._timestamp =
+      checkinDate && !Number.isNaN(checkinDate.getTime())
+        ? checkinDate
+        : new Date();
   }
 }
