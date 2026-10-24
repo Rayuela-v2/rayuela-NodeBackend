@@ -35,8 +35,8 @@ export class AnalyticsService {
     );
   }
 
-  getByStrategy() {
-    return this.analyticsDao.byStrategy();
+  getByStrategy(projectId?: string, startDate?: string, endDate?: string) {
+    return this.analyticsDao.byStrategy(projectId, startDate, endDate);
   }
 
   getPointsOverTime(
@@ -53,8 +53,12 @@ export class AnalyticsService {
     );
   }
 
-  getContributionRate(projectId?: string) {
-    return this.analyticsDao.contributionRate(projectId);
+  getContributionRate(
+    projectId?: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    return this.analyticsDao.contributionRate(projectId, startDate, endDate);
   }
 
   getBadgeAcquisitionOverTime(

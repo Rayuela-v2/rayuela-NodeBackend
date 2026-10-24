@@ -53,8 +53,12 @@ export class AnalyticsController {
   }
 
   @Get('by-strategy')
-  getByStrategy(): Promise<StrategyBreakdown[]> {
-    return this.analyticsService.getByStrategy();
+  getByStrategy(
+    @Query('projectId') projectId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ): Promise<StrategyBreakdown[]> {
+    return this.analyticsService.getByStrategy(projectId, startDate, endDate);
   }
 
   @Get('points-over-time')
@@ -75,8 +79,14 @@ export class AnalyticsController {
   @Get('contribution-rate')
   getContributionRate(
     @Query('projectId') projectId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ): Promise<ContributionRate[]> {
-    return this.analyticsService.getContributionRate(projectId);
+    return this.analyticsService.getContributionRate(
+      projectId,
+      startDate,
+      endDate,
+    );
   }
 
   @Get('badge-acquisition-over-time')
