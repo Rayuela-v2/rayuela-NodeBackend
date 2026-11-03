@@ -15,6 +15,7 @@ import { StorageModule } from './module/storage/storage.module';
 import { AnalyticsModule } from './module/analytics/analytics.module';
 import { HealthModule } from './module/health/health.module';
 import { GamificationIndicatorsModule } from './module/gamification-indicators/gamification-indicators.module';
+import { MapsModule } from './module/maps/maps.module';
 
 console.log(process.env.DB_CONNECTION as string);
 @Module({
@@ -35,6 +36,7 @@ console.log(process.env.DB_CONNECTION as string);
     StorageModule,
     AnalyticsModule,
     HealthModule,
+    MapsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
