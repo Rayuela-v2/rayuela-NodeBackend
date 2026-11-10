@@ -17,7 +17,6 @@ describe('ProjectController', () => {
     findOnePublic: jest.fn(),
     update: jest.fn(),
     toggleAvailable: jest.fn(),
-    migrateImages: jest.fn(),
   };
 
   const mockUserService = {};
@@ -81,16 +80,5 @@ describe('ProjectController', () => {
   it('should call toggleAvailable', async () => {
     await controller.toggleAvailable('1');
     expect(service.toggleAvailable).toHaveBeenCalledWith('1');
-  });
-
-  it('should call migrateImages', async () => {
-    mockProjectService.migrateImages = jest.fn().mockResolvedValue({
-      projectId: '1',
-      projectImageMigrated: true,
-      badgesMigratedCount: 0,
-      failures: [],
-    });
-    await controller.migrateImages('1');
-    expect(mockProjectService.migrateImages).toHaveBeenCalledWith('1');
   });
 });
