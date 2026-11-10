@@ -12,7 +12,6 @@ import {
   CheckInSchema,
   CheckInTemplate,
 } from '../checkin/persistence/checkin.schema';
-import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
@@ -23,7 +22,6 @@ import { StorageModule } from '../storage/storage.module';
     ]),
     AuthModule,
     GamificationModule,
-    StorageModule,
   ],
   controllers: [ProjectController],
   providers: [ProjectService, ProjectDao],

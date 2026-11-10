@@ -19,7 +19,7 @@ export class ProjectTemplate {
   @Prop({ maxlength: 500 })
   description: string;
 
-  @Prop({ required: true, maxlength: 500 })
+  @Prop({ default: '', maxlength: 500 })
   image: string;
 
   @Prop({ maxlength: 100 })

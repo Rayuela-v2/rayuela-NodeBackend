@@ -28,7 +28,7 @@ export enum RecommendationStrategy {
 export class CreateProjectDto {
   name: string;
   description?: string;
-  image: string;
+  image?: string;
   web?: string;
   available: boolean;
   manualLocation: boolean;
